@@ -1,0 +1,11 @@
+## To run it locally  
+        fastapi dev main.py --reload
+        uvicorn main:app --reload
+
+## Navigate to API doc
+        [local url](http://127.0.0.1:8000/docs)
+        
+
+
+## Gemini  
+        [model](https://ai.google.dev/gemini-api/docs/get-started/tutorial?lang=python)
