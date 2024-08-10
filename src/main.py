@@ -5,20 +5,21 @@ from typing import List
 from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from models import Applicant, InterviewConversation
+from service import service
 from sessions import (
     create_applicant,
     all_applicant,
     applicant_by_id,
-    applicant_chat,
     all_applicant_chat
 )
-from service import process
 
 app = FastAPI(
     title="Interview AI",
     description="Interview AI",
     version="0.1.0"
 )
+
+app.include_router(service, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,7 +31,6 @@ app.add_middleware(
 
 UPLOAD_DIR = "resumes"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 @app.post("/application/")
 async def upload_resume(
     fullname: str = File(...),
@@ -42,9 +42,10 @@ async def upload_resume(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    result = create_applicant(fullname, role, about, file_path)
+    applicant = create_applicant(fullname, role, about, file_path)
     
-    return {"message": result, "applicant_id": result.id}
+    return {"message": "Applicant created", "applicant_id": applicant.id}
+
 
 @app.get("/applicants/", response_model=List[Applicant])
 def get_applicants():
@@ -61,25 +62,3 @@ def get_applicant(applicant_id: int):
 def get_interview_results():
     return all_applicant_chat()
 
-@app.websocket("/ws/interview/{applicant_id}")
-async def websocket_endpoint(websocket: WebSocket, applicant_id: int):
-    await websocket.accept()
-    try:
-        applicant = applicant_by_id(applicant_id)
-        if not applicant:
-            await websocket.send_text("Applicant not found")
-            await websocket.close()
-            return
-        ai_message = await process(applicant.fullname, applicant.about, applicant.role, applicant.resume, "")
-        await websocket.send_text(ai_message)
-        applicant_chat(applicant_id, f"AI: {ai_message}")
-
-        while True:
-            user_message = await websocket.receive_text()
-            applicant_chat(applicant_id, f"Applicant: {user_message}")
-            ai_message = await process(applicant.fullname, applicant.about, applicant.role, applicant.resume, user_message)
-            await websocket.send_text(ai_message)
-            applicant_chat(applicant_id, f"AI: {ai_message}")
-
-    except WebSocketDisconnect:
-        applicant_chat(applicant_id, "Interview ended")

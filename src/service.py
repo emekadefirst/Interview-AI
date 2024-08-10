@@ -1,10 +1,18 @@
 import os
-import pdfplumber
+from fastapi import APIRouter, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from dotenv import load_dotenv
+from sessions import (
+
+    applicant_by_id,
+    applicant_chat,
+
+)
  
+service = APIRouter()
 
 try:
     import google.generativeai as genai
+    import pdfplumber
     print("Successfully imported google.generativeai")
     load_dotenv()
 
@@ -59,3 +67,28 @@ except ImportError as e:
 if __name__ == "__main__":
     result = process("Victor Chibuogwu Chukwumeka", "I'm an intelligent developer", "Python developer", "cv.pdf")
     print(result)
+
+
+
+@service.websocket("/ws/interview/{applicant_id}")
+async def websocket_endpoint(websocket: WebSocket, applicant_id: int):
+    await websocket.accept()
+    try:
+        applicant = applicant_by_id(applicant_id)
+        if not applicant:
+            await websocket.send_text("Applicant not found")
+            await websocket.close()
+            return
+        ai_message = await process(applicant.fullname, applicant.about, applicant.role, applicant.resume, "")
+        await websocket.send_text(ai_message)
+        applicant_chat(applicant_id, f"AI: {ai_message}")
+
+        while True:
+            user_message = await websocket.receive_text()
+            applicant_chat(applicant_id, f"Applicant: {user_message}")
+            ai_message = await process(applicant.fullname, applicant.about, applicant.role, applicant.resume, user_message)
+            await websocket.send_text(ai_message)
+            applicant_chat(applicant_id, f"AI: {ai_message}")
+
+    except WebSocketDisconnect:
+        applicant_chat(applicant_id, "Interview ended")

@@ -7,7 +7,9 @@ def create_applicant(fullname, role, about, resume):
         data = Applicant(fullname=fullname, role=role, about=about, resume=resume)
         session.add(data)
         session.commit()
-        return "Applicant created"
+        session.refresh(data)  
+        return data  
+
 def all_applicant():
     with Session(engine) as session:
         statement = select(Applicant)
