@@ -1,9 +1,8 @@
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from typing import List
-from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
 from models import Applicant, InterviewConversation
 from service import service
 from sessions import (
@@ -23,7 +22,7 @@ app.include_router(service, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://127.0.0.1:5500"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,11 +30,12 @@ app.add_middleware(
 
 UPLOAD_DIR = "resumes"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 @app.post("/application/")
 async def upload_resume(
-    fullname: str = File(...),
-    role: str = File(...),
-    about: str = File(...),
+    fullname: str = Form(...),
+    role: str = Form(...),
+    about: str = Form(...),
     file: UploadFile = File(...)
 ):
     file_path = os.path.join(UPLOAD_DIR, file.filename)
@@ -47,7 +47,7 @@ async def upload_resume(
     return {"message": "Applicant created", "applicant_id": applicant.id}
 
 
-@app.get("/applicants/", response_model=List[Applicant])
+@app.get("/applicants/")
 def get_applicants():
     return all_applicant()
 
@@ -58,7 +58,7 @@ def get_applicant(applicant_id: int):
         raise HTTPException(status_code=404, detail="Applicant not found")
     return applicant
 
-@app.get("/interview_results/", response_model=List[InterviewConversation])
+@app.get("/interview_results/")
 def get_interview_results():
     return all_applicant_chat()
 
