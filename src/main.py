@@ -1,3 +1,8 @@
+from fastapi import FastAPI, File, UploadFile
+from pydantic import BaseModel
+import os
+import subprocess
+import speech_recognition as sr
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -46,6 +51,9 @@ async def upload_resume(
     
     return {"message": "Applicant created", "applicant_id": applicant.id}
 
+    
+    return {"message": "Applicant created", "applicant_id": applicant.id}
+
 
 @app.get("/applicants/")
 def get_applicants():
@@ -62,3 +70,47 @@ def get_applicant(applicant_id: int):
 def get_interview_results():
     return all_applicant_chat()
 
+
+
+
+app = FastAPI()
+
+UPLOAD_DIR = "uploads"
+
+class AnalysisResult(BaseModel):
+    text: str
+
+@app.post("/analyze-video", response_model=AnalysisResult)
+async def analyze_video(file: UploadFile = File(...)):
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+    
+    audio_path = file_path.replace(".mp4", ".wav")
+    
+
+    extract_audio_command = [
+        "ffmpeg",
+        "-i", file_path,
+        "-q:a", "0",
+        "-map", "a",
+        audio_path
+    ]
+    subprocess.run(extract_audio_command)
+    
+    # Transcribe audio to text
+    recognizer = sr.Recognizer()
+    audio_file = sr.AudioFile(audio_path)
+    
+    with audio_file as source:
+        audio_data = recognizer.record(source)
+    
+    try:
+        text = recognizer.recognize_google(audio_data)
+    except sr.UnknownValueError:
+        text = "Audio not understood"
+    except sr.RequestError:
+        text = "Could not request results"
+    
+    return {"text": text}
