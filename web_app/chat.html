@@ -6,77 +6,120 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Interview Room</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f4f4f9;
+            font-family: Arial, sans-serif;
+        }
+
+        .chat-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
+        .chat-header {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .chat-box {
+            height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+
+        .message {
+            margin: 10px 0;
+        }
+
+        .message.ai {
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .message.user {
+            text-align: right;
+            color: #007bff;
+        }
+
+        .message-content {
+            display: inline-block;
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+
+        .message-content.ai {
+            background-color: #e9ecef;
+        }
+
+        .message-content.user {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .controls button {
+            margin: 0 10px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 10px;
+        }
+
+        .modal-content video {
+            width: 100%;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
 </head>
-<style>
-    body {
-        background-color: #f4f4f9;
-        font-family: Arial, sans-serif;
-    }
-
-    .chat-container {
-        max-width: 800px;
-        margin: 50px auto;
-        padding: 20px;
-        background-color: #fff;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        border-radius: 10px;
-    }
-
-    .chat-header {
-        text-align: center;
-        font-size: 24px;
-        font-weight: bold;
-        margin-bottom: 20px;
-    }
-
-    .chat-box {
-        height: 400px;
-        overflow-y: auto;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        background-color: #fafafa;
-    }
-
-    .message {
-        margin: 10px 0;
-    }
-
-    .message.ai {
-        text-align: left;
-        font-weight: bold;
-    }
-
-    .message.user {
-        text-align: right;
-        color: #007bff;
-    }
-
-    .message-content {
-        display: inline-block;
-        padding: 10px;
-        border-radius: 5px;
-        max-width: 80%;
-    }
-
-    .message-content.ai {
-        background-color: #e9ecef;
-    }
-
-    .message-content.user {
-        background-color: #007bff;
-        color: white;
-    }
-
-    .controls {
-        margin-top: 20px;
-        text-align: center;
-    }
-
-    .controls button {
-        margin: 0 10px;
-    }
-</style>
 
 <body>
     <div class="chat-container">
@@ -88,6 +131,14 @@
         </div>
         <div class="controls">
             <button class="btn btn-secondary" id="record">Record Response</button>
+        </div>
+    </div>
+
+    <!-- Modal Structure -->
+    <div id="recordModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <video id="videoElement" autoplay></video>
             <button class="btn btn-primary" id="send">Send Response</button>
         </div>
     </div>
@@ -112,23 +163,47 @@
             console.log("WebSocket connection closed");
         };
 
-        // Recording setup
+        // Modal setup
+        const modal = document.getElementById("recordModal");
+        const videoElement = document.getElementById("videoElement");
+        const recordButton = document.getElementById("record");
+        const closeButton = document.querySelector(".close");
+
         let isRecording = false;
         let mediaRecorder;
         let recordedChunks = [];
+        let stream; // Variable to store the media stream
 
-        document.getElementById("record").addEventListener("click", async function () {
-            if (!isRecording) {
-                isRecording = true;
-                document.getElementById("record").innerText = "Stop Recording";
-                startRecording();
-            } else {
-                isRecording = false;
-                document.getElementById("record").innerText = "Record Response";
-                stopRecording();
+        // Open modal and start video stream
+        recordButton.onclick = async function () {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "user" }, 
+                audio: true // Enable audio
+            });
+            videoElement.srcObject = stream; // Display live video
+            modal.style.display = "block";
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = function (e) {
+                recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.start(); // Start recording
+        };
+
+        // Close modal and stop video stream
+        closeButton.onclick = function () {
+            modal.style.display = "none";
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
             }
-        });
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop()); // Stop all media tracks
+            }
+            recordedChunks = [];
+        };
 
+        // Send the recorded video
         document.getElementById("send").addEventListener("click", async function () {
             if (recordedChunks.length > 0) {
                 const videoBlob = new Blob(recordedChunks, { type: "video/webm" });
@@ -147,24 +222,8 @@
                 }
                 recordedChunks = [];
             }
+            closeButton.onclick(); // Close the modal after sending the response
         });
-
-        async function startRecording() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-
-            mediaRecorder.ondataavailable = function (e) {
-                recordedChunks.push(e.data);
-            };
-
-            mediaRecorder.start();
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") {
-                mediaRecorder.stop();
-            }
-        }
 
         function addMessage(content, sender) {
             const chatBox = document.getElementById("chat-box");
@@ -184,6 +243,13 @@
         setTimeout(() => {
             addMessage("Welcome to your AI interview. Please introduce yourself.", "ai");
         }, 1000);
+
+        // Close modal if user clicks outside of it
+        window.onclick = function (event) {
+            if (event.target == modal) {
+                closeButton.onclick();
+            }
+        };
     </script>
 
 </body>
