@@ -1,16 +1,18 @@
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from typing import List
 from fastapi import FastAPI, File, UploadFile, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from src.models import Applicant, InterviewConversation
-from src.sessions import (
+from models import Applicant, InterviewConversation
+from sessions import (
     create_applicant,
     all_applicant,
     applicant_by_id,
     applicant_chat,
     all_applicant_chat
 )
-from src.service import process
+from service import process
 
 app = FastAPI(
     title="Interview AI",

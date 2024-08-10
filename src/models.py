@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlmodel import SQLModel, Field
-from .database import create_db
+from database import create_db
 
 class Applicant(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
