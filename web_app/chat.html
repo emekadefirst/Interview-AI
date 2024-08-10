@@ -93,12 +93,12 @@
     </div>
 
     <script>
-        let isRecording = false;
-        let mediaRecorder;
-        let recordedChunks = [];
+        // Extract applicant ID from the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const applicantId = urlParams.get('applicant_id');
 
-        // Set up WebSocket connection
-        const socket = new WebSocket("ws://127.0.0.1:8000/ws/interview/1"); // Change the applicant_id as needed
+        // WebSocket setup
+        const socket = new WebSocket(`ws://127.0.0.1:8000/ws/interview/${applicantId}`);
 
         socket.onmessage = function (event) {
             addMessage(event.data, "ai");
@@ -111,6 +111,11 @@
         socket.onclose = function () {
             console.log("WebSocket connection closed");
         };
+
+        // Recording setup
+        let isRecording = false;
+        let mediaRecorder;
+        let recordedChunks = [];
 
         document.getElementById("record").addEventListener("click", async function () {
             if (!isRecording) {
@@ -138,7 +143,6 @@
                 if (response.ok) {
                     const resultText = await response.text();
                     addMessage(resultText, "ai");
-                    // Send video analysis result back to WebSocket
                     socket.send(resultText);
                 }
                 recordedChunks = [];
@@ -181,6 +185,7 @@
             addMessage("Welcome to your AI interview. Please introduce yourself.", "ai");
         }, 1000);
     </script>
+
 </body>
 
 </html>

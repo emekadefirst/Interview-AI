@@ -50,41 +50,41 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.getElementById("application").addEventListener("submit", async function (event) {
-                event.preventDefault();
+            event.preventDefault();
 
-                const fullname = document.getElementById("fullname").value;
-                const role = document.getElementById("role").value;
-                const about = document.getElementById("about").value;
-                const resume = document.getElementById("resume").files[0]; // Get the file object
+            const fullname = document.getElementById("fullname").value;
+            const role = document.getElementById("role").value;
+            const about = document.getElementById("about").value;
+            const resume = document.getElementById("resume").files[0];
 
-                if (fullname && role && resume) {
-                    const formData = new FormData();
-                    formData.append("fullname", fullname);
-                    formData.append("role", role);
-                    formData.append("about", about);
-                    formData.append("file", resume);
+            if (fullname && role && resume) {
+                const formData = new FormData();
+                formData.append("fullname", fullname);
+                formData.append("role", role);
+                formData.append("about", about);
+                formData.append("file", resume);
 
-                    try {
-                        const response = await fetch("http://127.0.0.1:8000/application/", {
-                            method: "POST",
-                            body: formData
-                        });
+                try {
+                    const response = await fetch("http://127.0.0.1:8000/application/", {
+                        method: "POST",
+                        body: formData
+                    });
 
-                        if (response.ok) {
-                            alert("Application Submitted successfully");
-                            document.getElementById("application").reset();
-                        } else {
-                            alert("Failed to Submit.");
-                        }
-                    } catch (error) {
-                        alert("Application Submitted successfully");
+                    if (response.ok) {
+                        const result = await response.json();
+                        window.location.href = `chat.html?applicant_id=${result.applicant_id}`;
+                    } else {
+                        alert("Failed to Submit.");
                     }
-                } else {
-                    alert("Please enter valid details.");
+                } catch (error) {
+                    alert("Application submission failed.");
                 }
-            });
-
+            } else {
+                alert("Please enter valid details.");
+            }
+        });
     </script>
+
 </body>
 
 </html>
