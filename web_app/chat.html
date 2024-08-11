@@ -76,7 +76,6 @@
             margin: 0 10px;
         }
 
-        /* Modal styles */
         .modal {
             display: none;
             position: fixed;
@@ -144,11 +143,9 @@
     </div>
 
     <script>
-        // Extract applicant ID from the URL
         const urlParams = new URLSearchParams(window.location.search);
         const applicantId = urlParams.get('applicant_id');
 
-        // WebSocket setup
         const socket = new WebSocket(`ws://127.0.0.1:8000/ws/interview/${applicantId}`);
 
         socket.onmessage = function (event) {
@@ -163,66 +160,54 @@
             console.log("WebSocket connection closed");
         };
 
-        // Modal setup
         const modal = document.getElementById("recordModal");
         const videoElement = document.getElementById("videoElement");
         const recordButton = document.getElementById("record");
         const closeButton = document.querySelector(".close");
 
-        let isRecording = false;
+        let stream;
         let mediaRecorder;
-        let recordedChunks = [];
-        let stream; // Variable to store the media stream
+        let audioChunks = [];
 
-        // Open modal and start video stream
         recordButton.onclick = async function () {
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user" }, 
-                audio: true // Enable audio
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user" },
+                audio: true
             });
-            videoElement.srcObject = stream; // Display live video
+            videoElement.srcObject = stream;
             modal.style.display = "block";
-            mediaRecorder = new MediaRecorder(stream);
 
+            const audioStream = new MediaStream(stream.getAudioTracks());
+
+            mediaRecorder = new MediaRecorder(audioStream);
             mediaRecorder.ondataavailable = function (e) {
-                recordedChunks.push(e.data);
+                audioChunks.push(e.data);
             };
-
-            mediaRecorder.start(); // Start recording
+            mediaRecorder.start();
         };
 
-        // Close modal and stop video stream
         closeButton.onclick = function () {
             modal.style.display = "none";
             if (mediaRecorder && mediaRecorder.state !== "inactive") {
                 mediaRecorder.stop();
             }
             if (stream) {
-                stream.getTracks().forEach(track => track.stop()); // Stop all media tracks
+                stream.getTracks().forEach(track => track.stop());
             }
-            recordedChunks = [];
+            audioChunks = [];
         };
 
-        // Send the recorded video
         document.getElementById("send").addEventListener("click", async function () {
-            if (recordedChunks.length > 0) {
-                const videoBlob = new Blob(recordedChunks, { type: "video/webm" });
-                const formData = new FormData();
-                formData.append("video", videoBlob);
-
-                const response = await fetch("http://127.0.0.1:8000/analyze-video", {
-                    method: "POST",
-                    body: formData,
-                });
-
-                if (response.ok) {
-                    const resultText = await response.text();
-                    addMessage(resultText, "ai");
-                    socket.send(resultText);
-                }
-                recordedChunks = [];
+            if (audioChunks.length > 0) {
+                const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+                const reader = new FileReader();
+                reader.onloadend = function () {
+                    const base64AudioMessage = reader.result.split(',')[1];
+                    socket.send(base64AudioMessage);
+                };
+                reader.readAsDataURL(audioBlob);
             }
-            closeButton.onclick(); // Close the modal after sending the response
+            closeButton.onclick();
         });
 
         function addMessage(content, sender) {
@@ -239,12 +224,10 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // Optional: Initial welcome message
         setTimeout(() => {
             addMessage("Welcome to your AI interview. Please introduce yourself.", "ai");
         }, 1000);
 
-        // Close modal if user clicks outside of it
         window.onclick = function (event) {
             if (event.target == modal) {
                 closeButton.onclick();
@@ -253,5 +236,4 @@
     </script>
 
 </body>
-
 </html>

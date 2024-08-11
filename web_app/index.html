@@ -57,7 +57,7 @@
             const about = document.getElementById("about").value;
             const resume = document.getElementById("resume").files[0];
 
-            if (fullname && role && resume) {
+            if (fullname && role && about && resume) {
                 const formData = new FormData();
                 formData.append("fullname", fullname);
                 formData.append("role", role);
@@ -70,17 +70,27 @@
                         body: formData
                     });
 
+                    const result = await response.json();
+
                     if (response.ok) {
-                        const result = await response.json();
                         window.location.href = `chat.html?applicant_id=${result.applicant_id}`;
                     } else {
-                        alert("Failed to Submit.");
+                        // Log the error details
+                        console.error("Server responded with an error:", response.status, response.statusText);
+                        console.error("Error details:", result);
+
+                        // Show a more detailed error message
+                        alert(`Submission failed. Server responded with: ${response.status} ${response.statusText}. Please try again or contact support.`);
                     }
                 } catch (error) {
-                    alert("Application submission failed.");
+                    // Log the error for debugging
+                    console.error("Application submission failed:", error);
+
+                    // Show a user-friendly error message
+                    alert("Application submission failed due to a network error. Please check your internet connection and try again.");
                 }
             } else {
-                alert("Please enter valid details.");
+                alert("Please fill in all required fields and upload a resume.");
             }
         });
     </script>
