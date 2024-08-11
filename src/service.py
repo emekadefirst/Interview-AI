@@ -1,4 +1,6 @@
 import os
+import speech_recognition as sr
+from typing import Union, IO
 from pydantic import BaseModel
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -28,6 +30,31 @@ class ApplicantInfo(BaseModel):
 def extract_resume_text(resume_file: UploadFile) -> str:
     with pdfplumber.open(resume_file.file) as pdf:
         return "\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
+    
+"""user audio response"""
+def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
+    recognizer = sr.Recognizer()
+
+    try:
+        if isinstance(audio_input, str):
+            with sr.AudioFile(audio_input) as source:
+                audio_data = recognizer.record(source)
+        elif isinstance(audio_input, IO):
+            with sr.AudioFile(audio_input) as source:
+                audio_data = recognizer.record(source)
+            return "Invalid input type. Must be a file path or a file-like object."
+
+        text = recognizer.recognize_google(audio_data)
+        return text
+
+    except sr.UnknownValueError:
+        return "Google Speech Recognition could not understand the audio"
+    except sr.RequestError as e:
+        return f"Could not request results from Google Speech Recognition service; {e}"
+    except FileNotFoundError:
+        return "File not found"
+    except Exception as e:
+        return f"An error occurred: {e}"
 
 
 def generate_interview_prompt(applicant: ApplicantInfo, resume_content: str, conversation_history: str = "") -> str:
@@ -126,3 +153,7 @@ async def get_audio_file(filename: str):
         return StreamingResponse(open(audio_path, "rb"), media_type="audio/mp3")
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+    
+    
+
+
