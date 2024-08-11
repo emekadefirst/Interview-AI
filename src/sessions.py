@@ -20,7 +20,16 @@ def applicant_by_id(applicant_id):
     with Session(engine) as session:
         statement = select(Applicant).where(Applicant.id == applicant_id)
         response = session.exec(statement).one_or_none()
-        return response
+
+        if response:
+            return {
+                "fullname": response.fullname,
+                "role": response.role,
+                "about": response.about,
+                "resume": response.resume
+            }
+        return None
+
 
 """Chat"""  
 def applicant_chat(id, response):

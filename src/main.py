@@ -27,7 +27,7 @@ app.include_router(service, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5500", "https://interview-ai-seven.vercel.app/"],
+    allow_origins=["*"],  # Adjust this as needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,7 +49,7 @@ async def upload_resume(
 
     applicant = create_applicant(fullname, role, about, file_path)
     
-    return {"message": "Applicant created", "applicant_id": applicant.id}
+    return applicant.id
 
 
 
