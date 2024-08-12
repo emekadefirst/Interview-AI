@@ -24,7 +24,7 @@
 
         video {
             border: 1px solid #ccc;
-            width: 40%;
+            width: 60%;
             border-radius: 10px;
         }
 
@@ -68,7 +68,8 @@
         const stopRecordingBtn = document.getElementById('stop-recording');
         let mediaRecorder;
         let audioChunks = [];
-        navigator.mediaDevices.getUserMedia({ video: true})
+
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
             .then(stream => {
                 video.srcObject = stream;
 
@@ -83,60 +84,58 @@
                     audioChunks = [];
                     addMessage('You', audioUrl);
                 };
-            })
 
-            
-        startRecordingBtn.addEventListener('click', () => {
-                mediaRecorder.start();
-                startRecordingBtn.disabled = true;
-                stopRecordingBtn.disabled = false;
-            });
+                startRecordingBtn.addEventListener('click', () => {
+                    mediaRecorder.start();
+                    startRecordingBtn.disabled = true;
+                    stopRecordingBtn.disabled = false;
+                });
 
-            stopRecordingBtn.addEventListener('click', () => {
-                mediaRecorder.stop();
-                startRecordingBtn.disabled = false;
-                stopRecordingBtn.disabled = true;
-            });
+                stopRecordingBtn.addEventListener('click', () => {
+                    mediaRecorder.stop();
+                    startRecordingBtn.disabled = false;
+                    stopRecordingBtn.disabled = true;
+                });
             })
-            .catch (error => {
+            .catch(error => {
                 console.error('Error accessing webcam: ', error);
             });
 
-            function addMessage(text, audioUrl) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
+        function addMessage(text, audioUrl) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
 
-                const textDiv = document.createElement('div');
-                textDiv.className = 'text';
-                textDiv.textContent = text;
+            const textDiv = document.createElement('div');
+            textDiv.className = 'text';
+            textDiv.textContent = text;
 
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                audio.src = audioUrl;
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = audioUrl;
 
-                messageDiv.appendChild(textDiv);
-                messageDiv.appendChild(audio);
+            messageDiv.appendChild(textDiv);
+            messageDiv.appendChild(audio);
 
-                document.getElementById('messages').appendChild(messageDiv);
-            }
+            document.getElementById('messages').appendChild(messageDiv);
+        }
 
-            // Fetch initial messages
-            fetch('http://127.0.0.1:8000/apiinterview/4', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({})
-            })
-                .then(response => response.json())
-                .then(data => {
-                    data.messages.forEach(msg => {
-                        addMessage(msg.text, msg.audio_url);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error fetching messages: ', error);
+        // Fetch initial messages
+        fetch('http://127.0.0.1:8000/apiinterview/4', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+            .then(response => response.json())
+            .then(data => {
+                data.messages.forEach(msg => {
+                    addMessage(msg.text, msg.audio_url);
                 });
+            })
+            .catch(error => {
+                console.error('Error fetching messages: ', error);
+            });
     </script>
 </body>
 
