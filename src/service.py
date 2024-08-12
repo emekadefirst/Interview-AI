@@ -139,50 +139,48 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
 @service.post("interview/{applicant_id}")
 async def interview(applicant_id: int):
     fetch = applicant_by_id(applicant_id)
-    read = extract_resume_text(fetch['resume'])  # assuming fetch['resume'] is the file path
+    read = extract_resume_text(fetch['resume']) 
     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
-    conversation_history = ""  # Initialize empty conversation history
+    conversation_history = ""  
     response = process_applicant(applicant, read, conversation_history)
-    
-    # Return initial text and audio response
     return JSONResponse(content={
         "text": response['text'],
         "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
     })
 
-@service.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    query_params = websocket.query_params
-    applicant_id = query_params.get('applicant_id')
+# @service.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websocket.accept()
+#     query_params = websocket.query_params
+#     applicant_id = query_params.get('applicant_id')
 
-    try:
-        conversation_history = ""
-        while True:
-            audio_data = await websocket.receive_bytes()
-            r = sr.Recognizer()
-            audio = sr.AudioFile(io.BytesIO(audio_data))  
-            with audio as source:
-                audio_content = r.record(source)
-            text_in = r.recognize_google(audio_content) 
-            conversation_history += f"User: {text_in}\n"
+#     try:
+#         conversation_history = ""
+#         while True:
+#             audio_data = await websocket.receive_bytes()
+#             r = sr.Recognizer()
+#             audio = sr.AudioFile(io.BytesIO(audio_data))  
+#             with audio as source:
+#                 audio_content = r.record(source)
+#             text_in = r.recognize_google(audio_content) 
+#             conversation_history += f"User: {text_in}\n"
 
-            # Use the applicant_id to fetch the applicant data
-            fetch = applicant_by_id(applicant_id)
-            applicant_info = ApplicantInfo(
-                fullname=fetch['fullname'], 
-                role=fetch['role'], 
-                about=fetch['about']
-            )
+#             # Use the applicant_id to fetch the applicant data
+#             fetch = applicant_by_id(applicant_id)
+#             applicant_info = ApplicantInfo(
+#                 fullname=fetch['fullname'], 
+#                 role=fetch['role'], 
+#                 about=fetch['about']
+#             )
 
-            # Process the conversation
-            response = process_applicant(applicant_info, None, conversation_history)
-            conversation_history += f"AI: {response['text']}\n"
+#             # Process the conversation
+#             response = process_applicant(applicant_info, None, conversation_history)
+#             conversation_history += f"AI: {response['text']}\n"
             
-            await websocket.send_json({
-                "text": response['text'],
-                "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-            })
+#             await websocket.send_json({
+#                 "text": response['text'],
+#                 "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+#             })
     
-    except WebSocketDisconnect:
-        print("WebSocket disconnected")
+#     except WebSocketDisconnect:
+#         print("WebSocket disconnected")
