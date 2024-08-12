@@ -4,7 +4,7 @@ import speech_recognition as sr
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sessions import applicant_by_id
-from fastapi import UploadFile, Form
+from fastapi import routing
 import speech_recognition as sr
 from typing import Union, IO
 from pydantic import BaseModel
@@ -35,7 +35,6 @@ class ApplicantInfo(BaseModel):
     about: str
     role: str   
     
-
 
 
 def extract_resume_text(resume_file_path: str) -> str:
@@ -110,7 +109,7 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
         prompt = generate_interview_prompt(applicant, resume_content, conversation_history)
         response = model.generate_content(prompt)
         interview_text = response.text if response.text else "I apologize, but I couldn't generate a response. Let's try again."
-        ai_response = interview_text.replace("## Interviewer", "").strip()
+        ai_response = interview_text.replace("## InAS", "").strip()
         cleaned_text = ai_response.replace('"', '').strip()
 
         audio_filename = f"{applicant.fullname.replace(' ', '_')}_interview.mp3"
@@ -148,39 +147,3 @@ async def interview(applicant_id: int):
         "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
     })
 
-# @service.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     query_params = websocket.query_params
-#     applicant_id = query_params.get('applicant_id')
-
-#     try:
-#         conversation_history = ""
-#         while True:
-#             audio_data = await websocket.receive_bytes()
-#             r = sr.Recognizer()
-#             audio = sr.AudioFile(io.BytesIO(audio_data))  
-#             with audio as source:
-#                 audio_content = r.record(source)
-#             text_in = r.recognize_google(audio_content) 
-#             conversation_history += f"User: {text_in}\n"
-
-#             # Use the applicant_id to fetch the applicant data
-#             fetch = applicant_by_id(applicant_id)
-#             applicant_info = ApplicantInfo(
-#                 fullname=fetch['fullname'], 
-#                 role=fetch['role'], 
-#                 about=fetch['about']
-#             )
-
-#             # Process the conversation
-#             response = process_applicant(applicant_info, None, conversation_history)
-#             conversation_history += f"AI: {response['text']}\n"
-            
-#             await websocket.send_json({
-#                 "text": response['text'],
-#                 "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-#             })
-    
-#     except WebSocketDisconnect:
-#         print("WebSocket disconnected")
