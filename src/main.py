@@ -23,7 +23,7 @@ app = FastAPI(
 )
 
 app.include_router(service, prefix="/api")
-app.include_router(router, prefix="/api")
+app.include_router(router)
 
 app.add_middleware(
     CORSMiddleware,

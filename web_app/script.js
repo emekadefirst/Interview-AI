@@ -9,9 +9,8 @@ document
       return;
     }
 
-    // Start the interview
     try {
-      const response = await fetch(`${API_BASE_URL}/apiinterview/${applicantId}`, {
+      const response = await fetch(`${API_BASE_URL}/interview/${applicantId}`, {
         method: "POST",
       });
 
