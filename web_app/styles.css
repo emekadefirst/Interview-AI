@@ -21,6 +21,8 @@ input[type="text"] {
     padding: 10px;
     width: 200px;
     margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
 }
 
 button {
@@ -36,25 +38,13 @@ button:hover {
     background-color: #0056b3;
 }
 
-#audioPlayer {
-    margin-top: 10px;
-}
-
-#conversation {
-    text-align: left;
+#interviewSection {
     margin-top: 20px;
-    max-height: 300px;
-    overflow-y: auto;
 }
 
-.message {
-    margin: 10px 0;
-}
-
-.message.ai {
-    color: #007bff;
-}
-
-.message.user {
-    color: #28a745;
+.response-text {
+    margin-bottom: 10px;
+    font-size: 16px;
+    line-height: 1.5;
+    text-align: left;
 }
