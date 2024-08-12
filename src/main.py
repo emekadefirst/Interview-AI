@@ -9,6 +9,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from models import Applicant
 from service import service
+from upload import router
 from sessions import (
     all_applicant,
     applicant_by_id,
@@ -22,6 +23,7 @@ app = FastAPI(
 )
 
 app.include_router(service, prefix="/api")
+app.include_router(router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
