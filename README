@@ -1,26 +1,25 @@
-## To run it locally  
-        fastapi dev main.py --reload
+## To run it locally   
+        pip install -r requirements.txt
+        create .evn file and store db url and api key as 
+                postresql_url=
+                gemini_api=
+        cd src
         uvicorn main:app --reload
 
 ## Navigate to API doc
         [local url](http://127.0.0.1:8000/docs)
         
-
+## PostgreSQL from Render.com
+        [Render Database](render.com)        
 
 ## Gemini  
         [model](https://ai.google.dev/gemini-api/docs/get-started/tutorial?lang=python)
 
 
-pip install SpeechRecognition pydub
-
-import speech_recognition as sr
-
-filename = "16-122828-0002.wav"
-
-# open the file
-with sr.AudioFile(filename) as source:
-    # listen for the data (load audio to memory)
-    audio_data = r.record(source)
-    # recognize (convert from speech to text)
-    text = r.recognize_google(audio_data)
-    print(text)
+Ok so this project is not as easy as it look 
+i only manage to prompt the first response in 
+audio
+Cos commonn i couldn't sleep at night 
+Let's not even mention the fact that claudie and gpt weren't really helpful
+Right now i want to touch grass and rest 
+cos honestly I am feeling sick.
