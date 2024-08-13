@@ -74,6 +74,11 @@
             background-color: #f1f3f4;
         }
 
+        .response-area {
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
         main {
             height: 100vh;
             display: flex;
@@ -94,6 +99,9 @@
             <div class="col-md-6">
                 <div class="video-area">
                     AI Interviewer
+                </div>
+                <div class="response-area" id="responseArea">
+                    <!-- AI response will be displayed here -->
                 </div>
             </div>
             <div class="col-md-6">
@@ -178,14 +186,17 @@
             }
         }
 
-        // ...other existing functions...
-
         function addMessage(message, sender) {
             const messageElement = document.createElement('div');
             messageElement.classList.add('message', sender);
             messageElement.textContent = message.replace('## InAS: ', '').trim();
             document.getElementById('chatArea').appendChild(messageElement);
             document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+
+            // Also display AI response in the response area
+            if (sender === 'ai') {
+                document.getElementById('responseArea').textContent = messageElement.textContent;
+            }
         }
 
         function playAudio(audioUrl) {
