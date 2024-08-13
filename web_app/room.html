@@ -1,22 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interview</title>
-
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-</head>
-
-<body>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             background-color: #f0f0f0;
         }
-
         #video-container {
             justify-content: center;
             margin: 20px;
@@ -24,20 +18,17 @@
             height: 100%;
             display: block;
         }
-
         video {
             width: 85%;
             border-radius: 10px;
         }
-
         .video-area {
-            background-color: #202124;
+            background-color: #88898d;
             height: 100%;
-            color: white;
+            color: rgb(238, 231, 231);
             font-size: 24px;
             padding: 2rem 1rem;
         }
-
         .container {
             max-width: 900px;
             margin: 20px auto;
@@ -46,48 +37,42 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
-
         button {
             margin: 10px;
             padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
         }
-
         #recordButton {
             background-color: #ff4444;
             color: white;
             border: none;
             border-radius: 5px;
         }
-
         #recordButton.recording {
             background-color: #44ff44;
         }
-
         .response-area {
             margin-top: 2rem;
         }
-
         .response-area p {
             font-size: 1rem;
         }
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-size: 18px;
+        }
     </style>
-
+</head>
+<body>
     <div class="container">
         <div class="row items-start p-0">
             <div class="col-md-6 p-0">
                 <div class="video-area">
                     AI Interviewer
-
-                    <div class="response-area" id="responseArea">
-                        <p class="text-light mb-2">Lorem ipsum dolor sit, amet consectetur adipisicing elit.</p>
-
-                        <audio>
-                            <source src="../src/audio/Chibuogwu_Chukwuemeka_Victor_interview.mp3" />
-                            Your browser does not support the audio element.
-                        </audio>
-                    </div>
+                    <div class="response-area" id="responseArea"></div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -95,13 +80,81 @@
                     <video id="webcam" autoplay></video>
                     <div class="contain">
                         <h1>Record Response</h1>
-                        <button id="recordButton">Start Recording</button>
-                        <audio id="audioPlayback" controls style="display: none;"></audio>
+                        <button id="recordButton" onclick="startRecording()">Start Recording</button>
+                        <button id="stopButton" onclick="stopRecording()" style="display: none;">Stop Recording</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    <div id="loading">Loading interview data...</div>
+    <script>
+        let mediaRecorder;
+            let audioChunks = [];
+
+            const recordButton = document.getElementById('recordButton');
+            const stopButton = document.getElementById('stopButton');
+            const sendButton = document.getElementById('sendButton');
+
+            recordButton.addEventListener('click', startRecording);
+            stopButton.addEventListener('click', stopRecording);
+            sendButton.addEventListener('click', sendRecording);
+
+            async function startRecording() {
+                audioChunks = [];
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        sendButton.style.display = 'inline-block';
+                    };
+
+                    mediaRecorder.start();
+                    recordButton.style.display = 'none';
+                    stopButton.style.display = 'inline-block';
+                } catch (err) {
+                    console.error("Error accessing microphone:", err);
+                    alert("Error accessing microphone. Please check your settings.");
+                }
+            }
+
+            function stopRecording() {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    stopButton.style.display = 'none';
+                    recordButton.style.display = 'inline-block';
+                    recordButton.textContent = 'Record Again';
+                }
+            }
+
+            function sendRecording() {
+                const meetingCode = sessionStorage.getItem('meetingCode');
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                // Replace with your actual API endpoint
+                fetch(`http://127.0.0.1:8000/api/interview/${meetingCode}`, {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Success:', data);
+                        alert('Recording sent successfully!');
+                        sendButton.style.display = 'none';
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                        alert('An error occurred while sending the recording.');
+                    });
+            }
+    </script>
     <script>
         const video = document.getElementById('webcam');
         navigator.mediaDevices.getUserMedia({ video: true })
@@ -113,100 +166,92 @@
                 console.error('Error accessing camera:', error);
                 document.querySelector('.video-area').textContent = 'Error accessing camera. Please check your settings.';
             });
-    </script>
-    <script>
-        let applicantId = null;
-        let mediaRecorder;
-        let audioChunks = [];
 
-        document.addEventListener('DOMContentLoaded', function () {
-            const meetingCode = sessionStorage.getItem('meetingCode');
+        async function fetchInterviewDataWithRetry(meetingCode, retries = 3, delay = 10000) {
+            const url = `http://127.0.0.1:8000/api/interview/${meetingCode}`;
 
-            if (!meetingCode) {
-                alert('No meeting code found.');
-                return;
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ meetingCode })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    if (!data.audio_url) {
+                        throw new Error('No audio URL in the response.');
+                    }
+
+                    return data;
+                } catch (error) {
+                    console.error(`Attempt ${attempt} failed:`, error);
+                    if (attempt < retries) {
+                        console.log(`Retrying in ${delay / 1000} seconds...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        throw error;
+                    }
+                }
             }
+        }
 
-            startInterview(meetingCode);
-        });
+        document.addEventListener('DOMContentLoaded', async function (e) {
+            e.preventDefault();
+                const meetingCode = sessionStorage.getItem('meetingCode');
 
-        async function startInterview(meetingCode) {
-            try {
-                const formData = new FormData();
-                formData.append('number', meetingCode);
-
-                const response = await fetch(`http://127.0.0.1:8000/apiinterview/${meetingCode}`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                if (!meetingCode) {
+                    alert('No meeting code found.');
+                    return;
                 }
 
-                const data = await response.json();
-                applicantId = data.id;
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('recordBtn').disabled = false;
-                addMessage(data.text, 'ai');
-                playAudio(data.audio_url);
-            } catch (error) {
-                console.error('Error starting interview:', error);
-                addMessage("Error: Unable to start the interview. Please try again.", 'ai');
-                document.getElementById('startBtn').disabled = false;
-            }
-        }
+                document.getElementById('loading').style.display = 'block';
 
-        async function sendAudioToServer() {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            const formData = new FormData();
-            formData.append('audio_response', audioBlob, 'response.wav');
+                try {
+                    const data = await fetchInterviewDataWithRetry(meetingCode);
+                    const responseText = data.text || 'No text response provided.';
+                    const audioUrl = data.audio_url;
 
-            try {
-                const response = await fetch(`http://127.0.0.1:8000/apply/interview/${applicantId}`, {
-                    method: 'POST',
-                    body: formData
-                });
+                    const responseArea = document.getElementById('responseArea');
 
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    const textElement = document.createElement('p');
+                    textElement.textContent = responseText;
+                    responseArea.appendChild(textElement);
+
+                    const audioElement = document.createElement('audio');
+                    audioElement.controls = true;
+                    audioElement.src = audioUrl;
+                    audioElement.autoplay = true;
+                    responseArea.appendChild(audioElement);
+
+                    setTimeout(() => {
+                        audioElement.playbackRate = 1.75;
+                    }, 100);
+
+                    audioElement.addEventListener('ratechange', () => {
+                        if (audioElement.playbackRate !== 1.75) {
+                            audioElement.playbackRate = 1.75;
+                        }
+                    });
+
+                    // Wait for 5 seconds before reloading the page
+                    setTimeout(() => {
+                        location.reload();
+                    }, 5000);
+
+                } catch (error) {
+                    alert('An error occurred while fetching the interview data. Please check the console for more details.');
+                } finally {
+                    document.getElementById('loading').style.display = 'none';
                 }
-
-                const data = await response.json();
-
-                addMessage(`You: ${data.applicant_text}`, 'applicant');
-                addMessage(data.text, 'ai');
-                playAudio(data.audio_url);
-            } catch (error) {
-                console.error('Error sending audio to server:', error);
-                addMessage("Error: Unable to process your response. Please try again.", 'ai');
-            }
-        }
-
-        function addMessage(message, sender) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('message', sender);
-            messageElement.textContent = message.replace('## InAS: ', '').trim();
-            document.getElementById('chatArea').appendChild(messageElement);
-            document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
-
-            // Also display AI response in the response area
-            if (sender === 'ai') {
-                document.getElementById('responseArea').textContent = messageElement.textContent;
-            }
-        }
-
-        function playAudio(audioUrl) {
-            const audio = new Audio(audioUrl);
-            audio.onerror = () => {
-                console.error('Error playing audio.');
-                addMessage("Error: Unable to play the audio. Please try again later.", 'ai');
-            };
-            audio.play().catch(error => {
-                console.error('Error playing audio:', error);
             });
-        }
     </script>
 </body>
-
 </html>

@@ -1,4 +1,5 @@
 import os
+from fastapi.staticfiles import StaticFiles
 from fastapi import File, UploadFile, APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -24,14 +25,14 @@ except Exception as e:
     print(f"Failed to configure Generative AI: {e}")
     raise
 
-# Ensure necessary directories exist
 AUDIO_FOLDER = 'audio'
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
 RESUME_FOLDER = 'resumes'
 os.makedirs(RESUME_FOLDER, exist_ok=True)
 
-# Define the ApplicantInfo model
+service.mount("/apply/audio", StaticFiles(directory=AUDIO_FOLDER), name="audio")
+
 class ApplicantInfo(BaseModel):
     fullname: str
     about: str
@@ -110,18 +111,13 @@ def generate_interview_prompt(applicant: ApplicantInfo, resume_content: str, con
     Please provide the next question or response in the interview process.
     """
 
-# Process the applicant's information and generate a response
 def process_applicant(applicant: ApplicantInfo, resume_content: str, conversation_history: str = ""):
     try:
         prompt = generate_interview_prompt(applicant, resume_content, conversation_history)
         response = model.generate_content(prompt)
 
-        interview_text = response.text 
-        if response.text:
-            cleaned_text = response.text.replace("## InAS (Interviewer):", "").strip()
-            cleaned_text = cleaned_text.replace('"', '').strip()
-        else:
-            cleaned_text = "I apologize, but I couldn't generate a response. Let's try again."
+        interview_text = response.text if response.text else "I apologize, but I couldn't generate a response. Let's try again."
+        cleaned_text = interview_text.replace("## InAS (Interviewer):", "").strip().replace('"', '')
 
         audio_filename = f"{applicant.fullname.replace(' ', '_')}_interview.mp3"
         audio_path = os.path.join(AUDIO_FOLDER, audio_filename)
@@ -142,35 +138,44 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
             "audio_filename": ""
         }
 
-# API endpoint to handle the interview process
 @service.post("/interview/{applicant_code}")
 async def interview(applicant_code: str, audio: UploadFile = File(None)):
     fetch = applicant_by_id(applicant_code)
     if fetch is None:
         return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
+    
     resume_content = extract_resume_text(fetch['resume'])
     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
     conversation_history = conversation_histories.get(applicant_code, "")
+    
     response = process_applicant(applicant, resume_content, conversation_history)
-    if response:
+    
+    if response.get("error"):
+        return JSONResponse(content={"error": response["error"]}, status_code=500)
+    
+    if response.get("text") and response.get("audio_filename"):
+        conversation_histories[applicant_code] = response["text"]
         return JSONResponse(content={
             "text": response['text'],
             "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
         })
+
     if audio:
         audio_content = await audio.read()
-        audio_file_path = os.path.join(AUDIO_FOLDER, audio.filename)
+        audio_filename = f"{applicant_code}_{audio.filename}"
+        audio_file_path = os.path.join(AUDIO_FOLDER, audio_filename)
         with open(audio_file_path, 'wb') as audio_file:
             audio_file.write(audio_content)
 
         user_response_text = convert_audio_to_text(audio_file_path)
         conversation_histories[applicant_code] = user_response_text
+        
         return JSONResponse(content={
             "text": user_response_text,
-            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+            "audio_url": f"http://127.0.0.1:8000/apply/audio/{audio_filename}"
         })
-
-
+    
+    return JSONResponse(content={"error": "No response generated"}, status_code=400)
 
 @service.get("/apply/audio/{filename}")
 async def get_audio(filename: str):
@@ -178,25 +183,3 @@ async def get_audio(filename: str):
     if not os.path.exists(audio_path):
         raise HTTPException(status_code=404, detail="Audio file not found")
     return FileResponse(audio_path)
-
-
-    
-# @service.post("interview/{applicant_code}")
-# async def interview(applicant_code: str):
-#     fetch = applicant_by_id(applicant_code)
-#     if fetch is None:
-#         return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
-
-#     read = extract_resume_text(fetch['resume'])
-#     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
-    
-#     conversation_history = ""
-#     response = process_applicant(applicant, read, conversation_history)
-    
-#     return JSONResponse(content={
-#         "text": response['text'],
-#         "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-#     })
-    
-       
-

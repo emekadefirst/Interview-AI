@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -72,7 +71,6 @@
         }
     </style>
 </head>
-
 <body>
     <div class="container">
         <div class="title">Enter a meeting code</div>
@@ -85,7 +83,7 @@
     </div>
 
     <script>
-        document.getElementById('meetingForm').addEventListener('submit', function (e) {
+        document.getElementById('meetingForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const meetingCode = document.getElementById('meetingCode').value;
             sessionStorage.setItem('meetingCode', meetingCode);
@@ -93,5 +91,4 @@
         });
     </script>
 </body>
-
 </html>
