@@ -2,7 +2,6 @@ import os
 
 from fastapi import WebSocket, WebSocketDisconnect, UploadFile
 import json
-from fastapi import File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sessions import applicant_by_id
@@ -35,7 +34,6 @@ class ApplicantInfo(BaseModel):
     about: str
     role: str
 
-# Simulated conversation history storage (could be replaced with a database)
 conversation_histories = {}
 
 def extract_resume_text(resume_file_path: str) -> str:
@@ -107,7 +105,7 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
         prompt = generate_interview_prompt(applicant, resume_content, conversation_history)
         response = model.generate_content(prompt)
         interview_text = response.text if response.text else "I apologize, but I couldn't generate a response. Let's try again."
-        ai_response = interview_text.replace("## InAS", "").strip()
+        ai_response = interview_text.replace("## InAS interview", "").strip()
         cleaned_text = ai_response.replace('"', '').strip()
 
         audio_filename = f"{applicant.fullname.replace(' ', '_')}_interview.mp3"
@@ -129,44 +127,15 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
             "audio_filename": ""
         }
 
-@service.websocket("/ws/interview/{applicant_id}")
-async def websocket_endpoint(websocket: WebSocket, applicant_id: int):
-    await websocket.accept()
-
-    if applicant_id not in conversation_histories:
-        conversation_histories[applicant_id] = ""
-
-    try:
-        while True:
-            data = await websocket.receive_text()
-            data = json.loads(data)
-            
-            # Process audio if present
-            if "audio" in data:
-                audio_input = data["audio"]
-                file_path = f"temp_{applicant_id}.wav"
-                with open(file_path, "wb") as f:
-                    f.write(audio_input)
-
-                user_response_text = await convert_audio_to_text(file_path)
-                conversation_histories[applicant_id] += f"\nUser: {user_response_text}"
-            else:
-                user_response_text = None
-
-            fetch = await applicant_by_id(applicant_id)
-            resume_text = await extract_resume_text(fetch['resume'])
-            applicant = {
-                "fullname": fetch['fullname'],
-                "role": fetch['role'],
-                "about": fetch['about']
-            }
-            
-            response = await process_applicant(applicant, resume_text, conversation_histories[applicant_id])
-            conversation_histories[applicant_id] += f"\nAI: {response['text']}"
-
-            await websocket.send_text(json.dumps({
-                "text": response['text'],
-                "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-            }))
-    except WebSocketDisconnect:
-        print(f"Client disconnected: {applicant_id}")
+@service.post("interview/{applicant_id}")
+async def interview(applicant_id: int):
+    fetch = applicant_by_id(applicant_id)
+    read = extract_resume_text(fetch['resume']) 
+    applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
+    conversation_history = ""
+    while conversation_history is True:
+        response = process_applicant(applicant, read, conversation_history)
+        return JSONResponse(content={
+            "text": response['text'],
+            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+        })
