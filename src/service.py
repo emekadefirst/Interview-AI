@@ -1,14 +1,14 @@
 import os
-import io
-import speech_recognition as sr
+
+from fastapi import WebSocket, WebSocketDisconnect, UploadFile
+import json
+from fastapi import File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sessions import applicant_by_id
-from fastapi import routing
 import speech_recognition as sr
 from typing import Union, IO
-from pydantic import BaseModel
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter
 from dotenv import load_dotenv
 from gtts import gTTS
 import pdfplumber
@@ -33,18 +33,17 @@ os.makedirs(RESUME_FOLDER, exist_ok=True)
 class ApplicantInfo(BaseModel):
     fullname: str
     about: str
-    role: str   
-    
+    role: str
 
+# Simulated conversation history storage (could be replaced with a database)
+conversation_histories = {}
 
 def extract_resume_text(resume_file_path: str) -> str:
     with pdfplumber.open(resume_file_path) as pdf:
         return "\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
 
-"""user audio response"""
 def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
     recognizer = sr.Recognizer()
-
     try:
         if isinstance(audio_input, str):
             with sr.AudioFile(audio_input) as source:
@@ -66,10 +65,9 @@ def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
     except Exception as e:
         return f"An error occurred: {e}"
 
-
 def generate_interview_prompt(applicant: ApplicantInfo, resume_content: str, conversation_history: str = "") -> str:
     return f"""
-    Your name is InAS, you are an experienced conversational AI interviewer for Tech company. Your task is to conduct a professional and thorough interview with {applicant.fullname} for the position of {applicant.role}. Use the following information to tailor your questions and assess the candidate's suitability for the role:
+    Your name is InAS, you are an experienced conversational AI interviewer for Our Company. Your task is to conduct a professional and thorough interview with {applicant.fullname} for the position of {applicant.role}. Use the following information to tailor your questions and assess the candidate's suitability for the role:
     What wherever Tech stack or {applicant.role} they claim to be leverage on your descrection to ask industry based question like that of leetcode.
     Applicant Information:
     - Name: {applicant.fullname}
@@ -131,53 +129,44 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
             "audio_filename": ""
         }
 
+@service.websocket("/ws/interview/{applicant_id}")
+async def websocket_endpoint(websocket: WebSocket, applicant_id: int):
+    await websocket.accept()
 
-# @service.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     try:
-#         while True:
-#             data_in = await websocket.receive_text()
-#             add_message(data_in)
+    if applicant_id not in conversation_histories:
+        conversation_histories[applicant_id] = ""
 
-#             await websocket.send_text(f"Message text was: {data_in}")
-#     except WebSocketDisconnect:
-#         return "WebSocket disconnected"
-  
+    try:
+        while True:
+            data = await websocket.receive_text()
+            data = json.loads(data)
+            
+            # Process audio if present
+            if "audio" in data:
+                audio_input = data["audio"]
+                file_path = f"temp_{applicant_id}.wav"
+                with open(file_path, "wb") as f:
+                    f.write(audio_input)
 
+                user_response_text = await convert_audio_to_text(file_path)
+                conversation_histories[applicant_id] += f"\nUser: {user_response_text}"
+            else:
+                user_response_text = None
 
-@service.post("interview/{applicant_id}")
-async def interview(applicant_id: int):
-    fetch = applicant_by_id(applicant_id)
-    read = extract_resume_text(fetch['resume']) 
-    applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
-    conversation_history = ""
-    while conversation_history is True:
-        response = process_applicant(applicant, read, conversation_history)
-        return JSONResponse(content={
-            "text": response['text'],
-            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-        })
-        
+            fetch = await applicant_by_id(applicant_id)
+            resume_text = await extract_resume_text(fetch['resume'])
+            applicant = {
+                "fullname": fetch['fullname'],
+                "role": fetch['role'],
+                "about": fetch['about']
+            }
+            
+            response = await process_applicant(applicant, resume_text, conversation_histories[applicant_id])
+            conversation_histories[applicant_id] += f"\nAI: {response['text']}"
 
-from fastapi import File, UploadFile
-import tempfile
-
-@service.post("interview/{applicant_id}")
-async def interview(applicant_id: int, audio_response: UploadFile = File(...)):
-    fetch = applicant_by_id(applicant_id)
-    read = extract_resume_text(fetch['resume']) 
-    applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-        temp_audio.write(await audio_response.read())
-        temp_audio_path = temp_audio.name
-    user_response = convert_audio_to_text(temp_audio_path)
-    conversation_history = f"Applicant: {user_response}\n"
-    response = process_applicant(applicant, read, conversation_history)
-    conversation_history += f"InAS: {response['text']}\n"
-    return JSONResponse(content={
-        "applicant_text": user_response,
-        "ai_text": response['text'],
-        "ai_audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-    })
-
+            await websocket.send_text(json.dumps({
+                "text": response['text'],
+                "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+            }))
+    except WebSocketDisconnect:
+        print(f"Client disconnected: {applicant_id}")

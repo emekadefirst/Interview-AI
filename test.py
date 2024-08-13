@@ -137,3 +137,17 @@
 # </body>
 
 # </html>
+
+# @service.post("interview/{applicant_id}")
+# async def interview(applicant_id: int):
+#     fetch = applicant_by_id(applicant_id)
+#     read = extract_resume_text(fetch['resume']) 
+#     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
+#     conversation_history = ""
+#     while conversation_history is True:
+#         response = process_applicant(applicant, read, conversation_history)
+#         return JSONResponse(content={
+#             "text": response['text'],
+#             "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+#         })
+        
