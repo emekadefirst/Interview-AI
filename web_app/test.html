@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Recorder</title>
+    <title>Interview</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 </head>
@@ -16,7 +16,7 @@
             margin: 0;
             background-color: #f0f0f0;
         }
-    
+
         #video-container {
             justify-content: center;
             margin: 20px;
@@ -24,12 +24,12 @@
             height: 100%;
             display: block;
         }
-    
+
         video {
             width: 85%;
             border-radius: 10px;
         }
-    
+
         .video-area {
             background-color: #202124;
             height: 100%;
@@ -37,7 +37,7 @@
             font-size: 24px;
             padding: 2rem 1rem;
         }
-    
+
         .container {
             max-width: 900px;
             margin: 20px auto;
@@ -46,21 +46,21 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
-    
+
         button {
             margin: 10px;
             padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
         }
-    
+
         #recordButton {
             background-color: #ff4444;
             color: white;
             border: none;
             border-radius: 5px;
         }
-    
+
         #recordButton.recording {
             background-color: #44ff44;
         }
@@ -68,11 +68,12 @@
         .response-area {
             margin-top: 2rem;
         }
+
         .response-area p {
             font-size: 1rem;
         }
     </style>
-    
+
     <div class="container">
         <div class="row items-start p-0">
             <div class="col-md-6 p-0">
@@ -81,8 +82,8 @@
 
                     <div class="response-area" id="responseArea">
                         <p class="text-light mb-2">Lorem ipsum dolor sit, amet consectetur adipisicing elit.</p>
-                        
-                        <audio autoplay>
+
+                        <audio>
                             <source src="../src/audio/Chibuogwu_Chukwuemeka_Victor_interview.mp3" />
                             Your browser does not support the audio element.
                         </audio>
@@ -114,39 +115,96 @@
             });
     </script>
     <script>
+        let applicantId = null;
         let mediaRecorder;
         let audioChunks = [];
-        const recordButton = document.getElementById('recordButton');
-        const audioPlayback = document.getElementById('audioPlayback');
 
-        recordButton.addEventListener('click', toggleRecording);
+        document.addEventListener('DOMContentLoaded', function () {
+            const meetingCode = sessionStorage.getItem('meetingCode');
 
-        function toggleRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                recordButton.textContent = 'Start Recording';
-                recordButton.classList.remove('recording');
-            } else {
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(stream => {
-                        mediaRecorder = new MediaRecorder(stream);
-                        mediaRecorder.start();
-                        recordButton.textContent = 'Stop Recording';
-                        recordButton.classList.add('recording');
-
-                        mediaRecorder.addEventListener('dataavailable', event => {
-                            audioChunks.push(event.data);
-                        });
-
-                        mediaRecorder.addEventListener('stop', () => {
-                            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                            const audioUrl = URL.createObjectURL(audioBlob);
-                            audioPlayback.src = audioUrl;
-                            audioPlayback.style.display = 'block';
-                            audioChunks = [];
-                        });
-                    });
+            if (!meetingCode) {
+                alert('No meeting code found.');
+                return;
             }
+
+            startInterview(meetingCode);
+        });
+
+        async function startInterview(meetingCode) {
+            try {
+                const formData = new FormData();
+                formData.append('number', meetingCode);
+
+                const response = await fetch(`http://127.0.0.1:8000/apiinterview/${meetingCode}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                applicantId = data.id;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('recordBtn').disabled = false;
+                addMessage(data.text, 'ai');
+                playAudio(data.audio_url);
+            } catch (error) {
+                console.error('Error starting interview:', error);
+                addMessage("Error: Unable to start the interview. Please try again.", 'ai');
+                document.getElementById('startBtn').disabled = false;
+            }
+        }
+
+        async function sendAudioToServer() {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const formData = new FormData();
+            formData.append('audio_response', audioBlob, 'response.wav');
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/apply/interview/${applicantId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+
+                addMessage(`You: ${data.applicant_text}`, 'applicant');
+                addMessage(data.text, 'ai');
+                playAudio(data.audio_url);
+            } catch (error) {
+                console.error('Error sending audio to server:', error);
+                addMessage("Error: Unable to process your response. Please try again.", 'ai');
+            }
+        }
+
+        function addMessage(message, sender) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', sender);
+            messageElement.textContent = message.replace('## InAS: ', '').trim();
+            document.getElementById('chatArea').appendChild(messageElement);
+            document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
+
+            // Also display AI response in the response area
+            if (sender === 'ai') {
+                document.getElementById('responseArea').textContent = messageElement.textContent;
+            }
+        }
+
+        function playAudio(audioUrl) {
+            const audio = new Audio(audioUrl);
+            audio.onerror = () => {
+                console.error('Error playing audio.');
+                addMessage("Error: Unable to play the audio. Please try again later.", 'ai');
+            };
+            audio.play().catch(error => {
+                console.error('Error playing audio:', error);
+            });
         }
     </script>
 </body>

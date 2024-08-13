@@ -1,45 +1,54 @@
 import os
-
-from fastapi import WebSocket, WebSocketDisconnect, UploadFile
-import json
+from fastapi import File, UploadFile, APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sessions import applicant_by_id
 import speech_recognition as sr
 from typing import Union, IO
-from fastapi import APIRouter
 from dotenv import load_dotenv
 from gtts import gTTS
 import pdfplumber
 import google.generativeai as genai
+from fastapi.responses import FileResponse
 
 service = APIRouter()
 
+# Load environment variables
 load_dotenv()
+
+# Configure Generative AI model
 try:
     genai.configure(api_key=os.environ.get('gemini_api'))
     model = genai.GenerativeModel('gemini-1.5-pro')
-except ImportError as e:
-    print(f"Failed to import libraries: {e}")
+except Exception as e:
+    print(f"Failed to configure Generative AI: {e}")
     raise
 
+# Ensure necessary directories exist
 AUDIO_FOLDER = 'audio'
 os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
 RESUME_FOLDER = 'resumes'
 os.makedirs(RESUME_FOLDER, exist_ok=True)
 
+# Define the ApplicantInfo model
 class ApplicantInfo(BaseModel):
     fullname: str
     about: str
     role: str
 
+# Conversation history storage
 conversation_histories = {}
 
+# Extract text from resume PDF
 def extract_resume_text(resume_file_path: str) -> str:
-    with pdfplumber.open(resume_file_path) as pdf:
-        return "\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
+    try:
+        with pdfplumber.open(resume_file_path) as pdf:
+            return "\n".join(page.extract_text() for page in pdf.pages if page.extract_text())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error extracting resume text: {str(e)}")
 
+# Convert audio to text using speech recognition
 def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
     recognizer = sr.Recognizer()
     try:
@@ -49,10 +58,10 @@ def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
         elif isinstance(audio_input, IO):
             with sr.AudioFile(audio_input) as source:
                 audio_data = recognizer.record(source)
+        else:
             return "Invalid input type. Must be a file path or a file-like object."
 
-        text = recognizer.recognize_google(audio_data)
-        return text
+        return recognizer.recognize_google(audio_data)
 
     except sr.UnknownValueError:
         return "Google Speech Recognition could not understand the audio"
@@ -63,10 +72,11 @@ def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
     except Exception as e:
         return f"An error occurred: {e}"
 
+# Generate interview prompt for the AI model
 def generate_interview_prompt(applicant: ApplicantInfo, resume_content: str, conversation_history: str = "") -> str:
     return f"""
     Your name is InAS, you are an experienced conversational AI interviewer for Our Company. Your task is to conduct a professional and thorough interview with {applicant.fullname} for the position of {applicant.role}. Use the following information to tailor your questions and assess the candidate's suitability for the role:
-    What wherever Tech stack or {applicant.role} they claim to be leverage on your descrection to ask industry based question like that of leetcode.
+    What wherever Tech stack or {applicant.role} they claim to be leverage on your discretion to ask industry-based questions like that of leetcode.
     Applicant Information:
     - Name: {applicant.fullname}
     - Role applying for: {applicant.role}
@@ -84,7 +94,7 @@ def generate_interview_prompt(applicant: ApplicantInfo, resume_content: str, con
          - Situational questions
          - Questions about their experience and skills mentioned in the resume
     3. Allow the candidate to ask questions about the role or company.
-    4. Test their problem solving ability
+    4. Test their problem-solving ability
     5. Conclude the interview professionally when appropriate.
 
     Evaluation Criteria:
@@ -100,10 +110,12 @@ def generate_interview_prompt(applicant: ApplicantInfo, resume_content: str, con
     Please provide the next question or response in the interview process.
     """
 
+# Process the applicant's information and generate a response
 def process_applicant(applicant: ApplicantInfo, resume_content: str, conversation_history: str = ""):
     try:
         prompt = generate_interview_prompt(applicant, resume_content, conversation_history)
         response = model.generate_content(prompt)
+
         interview_text = response.text 
         if response.text:
             cleaned_text = response.text.replace("## InAS (Interviewer):", "").strip()
@@ -130,19 +142,61 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
             "audio_filename": ""
         }
 
-@service.post("interview/{applicant_code}")
-async def interview(applicant_code: str):
+# API endpoint to handle the interview process
+@service.post("/interview/{applicant_code}")
+async def interview(applicant_code: str, audio: UploadFile = File(None)):
     fetch = applicant_by_id(applicant_code)
     if fetch is None:
         return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
-
-    read = extract_resume_text(fetch['resume'])
+    resume_content = extract_resume_text(fetch['resume'])
     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
+    conversation_history = conversation_histories.get(applicant_code, "")
+    response = process_applicant(applicant, resume_content, conversation_history)
+    if response:
+        return JSONResponse(content={
+            "text": response['text'],
+            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+        })
+    if audio:
+        audio_content = await audio.read()
+        audio_file_path = os.path.join(AUDIO_FOLDER, audio.filename)
+        with open(audio_file_path, 'wb') as audio_file:
+            audio_file.write(audio_content)
+
+        user_response_text = convert_audio_to_text(audio_file_path)
+        conversation_histories[applicant_code] = user_response_text
+        return JSONResponse(content={
+            "text": user_response_text,
+            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+        })
+
+
+
+@service.get("/apply/audio/{filename}")
+async def get_audio(filename: str):
+    audio_path = os.path.join(AUDIO_FOLDER, filename)
+    if not os.path.exists(audio_path):
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    return FileResponse(audio_path)
+
+
     
-    conversation_history = ""
-    response = process_applicant(applicant, read, conversation_history)
+# @service.post("interview/{applicant_code}")
+# async def interview(applicant_code: str):
+#     fetch = applicant_by_id(applicant_code)
+#     if fetch is None:
+#         return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
+
+#     read = extract_resume_text(fetch['resume'])
+#     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
     
-    return JSONResponse(content={
-        "text": response['text'],
-        "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-    })
+#     conversation_history = ""
+#     response = process_applicant(applicant, read, conversation_history)
+    
+#     return JSONResponse(content={
+#         "text": response['text'],
+#         "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+#     })
+    
+       
+
