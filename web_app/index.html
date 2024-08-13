@@ -44,7 +44,7 @@
                 </div>
                 <div class="d-flex">
                     <button type="button" class="btn btn-primary" id="submitBtn">Submit</button>
-                    <button type="button" class="btn btn-secondary ms-auto">Start interview</button>
+                    <a href="door.html" type="button" class="btn btn-secondary ms-auto" id="interviewBtn">Start interview</a>
                 </div>
             </form>
         </div>
@@ -71,7 +71,8 @@
                 .then(function (response) {
                     console.log('Success:', response.data);
                     const interviewId = response.data.interview_id;
-                    alert(`Application submitted successfully! This is your interview #${interviewId}`);
+                    alert(`Application submitted successfully! This is your interview  number ${interviewId}`);
+
                 })
                 .catch(function (error) {
                     console.error('Error:', error);

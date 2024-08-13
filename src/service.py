@@ -132,6 +132,17 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
         }
 
 
+# @service.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     await websocket.accept()
+#     try:
+#         while True:
+#             data_in = await websocket.receive_text()
+#             add_message(data_in)
+
+#             await websocket.send_text(f"Message text was: {data_in}")
+#     except WebSocketDisconnect:
+#         return "WebSocket disconnected"
   
 
 
@@ -140,10 +151,33 @@ async def interview(applicant_id: int):
     fetch = applicant_by_id(applicant_id)
     read = extract_resume_text(fetch['resume']) 
     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
-    conversation_history = ""  
+    conversation_history = ""
+    while conversation_history is True:
+        response = process_applicant(applicant, read, conversation_history)
+        return JSONResponse(content={
+            "text": response['text'],
+            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+        })
+        
+
+from fastapi import File, UploadFile
+import tempfile
+
+@service.post("interview/{applicant_id}")
+async def interview(applicant_id: int, audio_response: UploadFile = File(...)):
+    fetch = applicant_by_id(applicant_id)
+    read = extract_resume_text(fetch['resume']) 
+    applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
+        temp_audio.write(await audio_response.read())
+        temp_audio_path = temp_audio.name
+    user_response = convert_audio_to_text(temp_audio_path)
+    conversation_history = f"Applicant: {user_response}\n"
     response = process_applicant(applicant, read, conversation_history)
+    conversation_history += f"InAS: {response['text']}\n"
     return JSONResponse(content={
-        "text": response['text'],
-        "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+        "applicant_text": user_response,
+        "ai_text": response['text'],
+        "ai_audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
     })
 
