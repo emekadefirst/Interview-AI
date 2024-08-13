@@ -89,15 +89,6 @@
 </head>
 
 <body>
-    <form id="interviewForm" class="container" style="width: 18rem;">
-        <div class="mb-3 mt-4">
-            <input type="text" class="form-control" id="number" placeholder="Enter your interview number">
-        </div>
-        <div class="d-flex">
-            <button type="button" class="btn btn-primary ms-auto my-3" id="submitBtn">Start
-                Interview</button>
-        </div>
-    </form>
     <div class="container">
         <div class="row">
             <div class="col-md-6">
@@ -123,31 +114,23 @@
         let mediaRecorder;
         let audioChunks = [];
 
-        const startBtn = document.getElementById('startBtn');
-        const recordBtn = document.getElementById('recordBtn');
-        const chatArea = document.getElementById('chatArea');
-        const myModal = new bootstrap.Modal(document.getElementById('exampleModal'));
-
         document.addEventListener('DOMContentLoaded', function () {
-            myModal.show();
+            const meetingCode = sessionStorage.getItem('meetingCode');
 
-            const submit = document.getElementById('submitBtn');
-            submit.addEventListener('click', async function () {
-                const number = document.getElementById('number').value;
-                myModal.hide();
-                await startInterview(number);
-            });
+            if (!meetingCode) {
+                alert('No meeting code found.');
+                return;
+            }
+
+            startInterview(meetingCode);
         });
 
-        startBtn.addEventListener('click', () => myModal.show());
-        recordBtn.addEventListener('click', toggleRecording);
-
-        async function startInterview(number) {
+        async function startInterview(meetingCode) {
             try {
                 const formData = new FormData();
-                formData.append('number', number);
+                formData.append('number', meetingCode);
 
-                const response = await fetch(`http://127.0.0.1:8000/api/interview/${number}`, {
+                const response = await fetch(`http://127.0.0.1:8000/api/interview/${meetingCode}`, {
                     method: 'POST',
                     body: formData
                 });
@@ -158,36 +141,14 @@
 
                 const data = await response.json();
                 applicantId = data.id;
-                startBtn.disabled = true;
-                recordBtn.disabled = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('recordBtn').disabled = false;
                 addMessage(data.text, 'ai');
                 playAudio(data.audio_url);
             } catch (error) {
                 console.error('Error starting interview:', error);
                 addMessage("Error: Unable to start the interview. Please try again.", 'ai');
-                startBtn.disabled = false;
-            }
-        }
-
-        async function toggleRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                recordBtn.textContent = 'Record Response';
-            } else {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
-                    mediaRecorder.onstop = sendAudioToServer;
-                    audioChunks = [];
-                    mediaRecorder.start();
-                    recordBtn.textContent = 'Stop Recording';
-                } catch (error) {
-                    console.error('Error accessing microphone:', error);
-                    addMessage("Error: Unable to access microphone. Please check your settings.", 'ai');
-                }
+                document.getElementById('startBtn').disabled = false;
             }
         }
 
@@ -217,12 +178,14 @@
             }
         }
 
+        // ...other existing functions...
+
         function addMessage(message, sender) {
             const messageElement = document.createElement('div');
             messageElement.classList.add('message', sender);
             messageElement.textContent = message.replace('## InAS: ', '').trim();
-            chatArea.appendChild(messageElement);
-            chatArea.scrollTop = chatArea.scrollHeight;
+            document.getElementById('chatArea').appendChild(messageElement);
+            document.getElementById('chatArea').scrollTop = document.getElementById('chatArea').scrollHeight;
         }
 
         function playAudio(audioUrl) {
