@@ -8,7 +8,7 @@ def create_applicant(fullname, role, about, resume):
         session.add(data)
         session.commit()
         session.refresh(data)
-        response = {"interview_id": data.id }  
+        response = {"interview_id": data.code }  
         return response
 
 def all_applicant():
@@ -17,9 +17,9 @@ def all_applicant():
         application = session.exec(statement).all()
         return application
 
-def applicant_by_id(applicant_id):
+def applicant_by_id(applicant_code):
     with Session(engine) as session:
-        statement = select(Applicant).where(Applicant.id == applicant_id)
+        statement = select(Applicant).where(Applicant.code == applicant_code)
         response = session.exec(statement).one_or_none()
 
         if response:

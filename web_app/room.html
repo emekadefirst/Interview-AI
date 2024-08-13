@@ -130,7 +130,7 @@
                 const formData = new FormData();
                 formData.append('number', meetingCode);
 
-                const response = await fetch(`http://127.0.0.1:8000/api/interview/${meetingCode}`, {
+                const response = await fetch(`http://127.0.0.1:8000/apiinterview/${meetingCode}`, {
                     method: 'POST',
                     body: formData
                 });

@@ -104,9 +104,12 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
     try:
         prompt = generate_interview_prompt(applicant, resume_content, conversation_history)
         response = model.generate_content(prompt)
-        interview_text = response.text if response.text else "I apologize, but I couldn't generate a response. Let's try again."
-        ai_response = interview_text.replace("## InAS interview", "").strip()
-        cleaned_text = ai_response.replace('"', '').strip()
+        interview_text = response.text 
+        if response.text:
+            cleaned_text = response.text.replace("## InAS (Interviewer):", "").strip()
+            cleaned_text = cleaned_text.replace('"', '').strip()
+        else:
+            cleaned_text = "I apologize, but I couldn't generate a response. Let's try again."
 
         audio_filename = f"{applicant.fullname.replace(' ', '_')}_interview.mp3"
         audio_path = os.path.join(AUDIO_FOLDER, audio_filename)
@@ -127,15 +130,19 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
             "audio_filename": ""
         }
 
-@service.post("interview/{applicant_id}")
-async def interview(applicant_id: int):
-    fetch = applicant_by_id(applicant_id)
-    read = extract_resume_text(fetch['resume']) 
+@service.post("interview/{applicant_code}")
+async def interview(applicant_code: str):
+    fetch = applicant_by_id(applicant_code)
+    if fetch is None:
+        return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
+
+    read = extract_resume_text(fetch['resume'])
     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
+    
     conversation_history = ""
-    while conversation_history is True:
-        response = process_applicant(applicant, read, conversation_history)
-        return JSONResponse(content={
-            "text": response['text'],
-            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-        })
+    response = process_applicant(applicant, read, conversation_history)
+    
+    return JSONResponse(content={
+        "text": response['text'],
+        "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+    })
