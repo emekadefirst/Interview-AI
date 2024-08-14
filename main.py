@@ -8,9 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from models import Applicant
+from src.models import Applicant
 from src.service import service
-from upload import router
+from src.upload import router
 from src.sessions import (
     all_applicant,
     applicant_by_id,

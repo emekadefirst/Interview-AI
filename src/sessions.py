@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
-from models import Applicant, InterviewConversation
-from database import engine
+from .models import Applicant, InterviewConversation
+from .database import engine
 
 def create_applicant(fullname, role, about, resume):
     with Session(engine) as session:

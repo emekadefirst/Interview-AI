@@ -50,6 +50,11 @@
             border: none;
             cursor: pointer;
             border-radius: 5px;
+            outline: none;
+        }
+
+        #record-btn.recording {
+            background: #ff4d4d;
         }
     </style>
 </head>
@@ -67,6 +72,8 @@
 
         const chatBox = document.getElementById('chat-box');
         const recordBtn = document.getElementById('record-btn');
+        let mediaRecorder;
+        let audioChunks = [];
 
         websocket.onopen = () => {
             console.log("WebSocket connection established");
@@ -85,9 +92,10 @@
             console.log("WebSocket connection closed");
         };
 
-        recordBtn.addEventListener('click', () => {
-            startRecording();
-        });
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('touchstart', startRecording); // For touch devices
+        recordBtn.addEventListener('touchend', stopRecording);   // For touch devices
 
         function displayMessage(sender, message) {
             const messageElement = document.createElement('div');
@@ -104,27 +112,32 @@
         }
 
         function startRecording() {
-            // Placeholder for recording and sending audio to the server
+            recordBtn.classList.add('recording');
+            recordBtn.innerText = 'Recording...';
+
             navigator.mediaDevices.getUserMedia({ audio: true })
                 .then(stream => {
-                    const mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder = new MediaRecorder(stream);
                     mediaRecorder.start();
-
-                    let audioChunks = [];
+                    audioChunks = [];
 
                     mediaRecorder.addEventListener("dataavailable", event => {
                         audioChunks.push(event.data);
                     });
-
-                    mediaRecorder.addEventListener("stop", () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        sendAudioToServer(audioBlob);
-                    });
-
-                    setTimeout(() => {
-                        mediaRecorder.stop();
-                    }, 3000); // Stop recording after 3 seconds (adjust as needed)
                 });
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordBtn.classList.remove('recording');
+                recordBtn.innerText = 'Start Recording';
+
+                mediaRecorder.addEventListener("stop", () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    sendAudioToServer(audioBlob);
+                });
+            }
         }
 
         function sendAudioToServer(audioBlob) {

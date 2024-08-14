@@ -2,7 +2,7 @@ import os
 import shutil
 from typing import Optional
 from pydantic import BaseModel
-from sessions import create_applicant
+from .sessions import create_applicant
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form
 
 router = APIRouter()

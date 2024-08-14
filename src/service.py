@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import File, UploadFile, APIRouter, HTTPException, WebSocket, WebSocketDisconnect, WebSocketException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sessions import *
+from .sessions import *
 import speech_recognition as sr
 from typing import Union, IO
 from dotenv import load_dotenv
