@@ -1,9 +1,9 @@
 import os
 from fastapi.staticfiles import StaticFiles
-from fastapi import File, UploadFile, APIRouter, HTTPException
+from fastapi import File, UploadFile, APIRouter, HTTPException, WebSocket, WebSocketDisconnect, WebSocketException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sessions import applicant_by_id
+from sessions import *
 import speech_recognition as sr
 from typing import Union, IO
 from dotenv import load_dotenv
@@ -138,48 +138,68 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
             "audio_filename": ""
         }
 
-@service.post("/interview/{applicant_code}")
-async def interview(applicant_code: str, audio: UploadFile = File(None)):
-    fetch = applicant_by_id(applicant_code)
-    if fetch is None:
-        return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
+# @service.post("/interview/{applicant_code}")
+# async def interview(applicant_code: str, audio: UploadFile = File(None)):
+#     fetch = applicant_by_id(applicant_code)
+#     if fetch is None:
+#         return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
     
-    resume_content = extract_resume_text(fetch['resume'])
-    applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
-    conversation_history = conversation_histories.get(applicant_code, "")
+#     resume_content = extract_resume_text(fetch['resume'])
+#     applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
+#     conversation_history = conversation_histories.get(applicant_code, "")
     
-    response = process_applicant(applicant, resume_content, conversation_history)
+#     response = process_applicant(applicant, resume_content, conversation_history)
     
-    if response.get("error"):
-        return JSONResponse(content={"error": response["error"]}, status_code=500)
+#     if response.get("error"):
+#         return JSONResponse(content={"error": response["error"]}, status_code=500)
     
-    if response.get("text") and response.get("audio_filename"):
-        conversation_histories[applicant_code] = response["text"]
-        return JSONResponse(content={
+#     if response.get("text") and response.get("audio_filename"):
+#         conversation_histories[applicant_code] = response["text"]
+#         return JSONResponse(content={
+#             "text": response['text'],
+#             "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+#         })
+
+#     if audio:
+#         audio_content = await audio.read()
+#         audio_filename = f"{applicant_code}_{audio.filename}"
+#         audio_file_path = os.path.join(AUDIO_FOLDER, audio_filename)
+#         with open(audio_file_path, 'wb') as audio_file:
+#             audio_file.write(audio_content)
+
+#         user_response_text = convert_audio_to_text(audio_file_path)
+#         conversation_histories[applicant_code] = user_response_text
+        
+#         return JSONResponse(content={
+#             "text": user_response_text,
+#             "audio_url": f"http://127.0.0.1:8000/apply/audio/{audio_filename}"
+#         })
+    
+#     return JSONResponse(content={"error": "No response generated"}, status_code=400)
+
+# @service.get("/apply/audio/{filename}")
+# async def get_audio(filename: str):
+#     audio_path = os.path.join(AUDIO_FOLDER, filename)
+#     if not os.path.exists(audio_path):
+#         raise HTTPException(status_code=404, detail="Audio file not found")
+#     return FileResponse(audio_path)
+
+
+@service.websocket("/interview/{applicant_code}")
+async def interview_room(websocket: WebSocket, applicant_code: str, audio: UploadFile = File(None)):
+    await websocket.accept()
+    try:
+        while True:
+            data_in = await websocket.receive_text()
+            fetch = applicant_by_id(applicant_code)
+            resume_content = extract_resume_text(fetch['resume'])
+            applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
+            conversation_history = conversation_histories.get(applicant_code, "")
+            response = process_applicant(applicant, resume_content, conversation_history)
+            await websocket.send_text(content={
             "text": response['text'],
             "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
-        })
-
-    if audio:
-        audio_content = await audio.read()
-        audio_filename = f"{applicant_code}_{audio.filename}"
-        audio_file_path = os.path.join(AUDIO_FOLDER, audio_filename)
-        with open(audio_file_path, 'wb') as audio_file:
-            audio_file.write(audio_content)
-
-        user_response_text = convert_audio_to_text(audio_file_path)
-        conversation_histories[applicant_code] = user_response_text
-        
-        return JSONResponse(content={
-            "text": user_response_text,
-            "audio_url": f"http://127.0.0.1:8000/apply/audio/{audio_filename}"
-        })
-    
-    return JSONResponse(content={"error": "No response generated"}, status_code=400)
-
-@service.get("/apply/audio/{filename}")
-async def get_audio(filename: str):
-    audio_path = os.path.join(AUDIO_FOLDER, filename)
-    if not os.path.exists(audio_path):
-        raise HTTPException(status_code=404, detail="Audio file not found")
-    return FileResponse(audio_path)
+            })
+    except WebSocketDisconnect:
+        applicant_chat(applicant_code, response)
+        return "WebSocket disconnected"

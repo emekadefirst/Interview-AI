@@ -33,9 +33,9 @@ def applicant_by_id(applicant_code):
 
 
 """Chat"""  
-def applicant_chat(id, response):
+def applicant_chat(code, response):
     with Session(engine) as session:
-        data = InterviewConversation(applicant=id, interview_result=response)
+        data = InterviewConversation(applicant=code, interview_result=response)
         session.add(data)
         session.commit()
         return "Applicant created"
