@@ -189,17 +189,49 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
 async def interview_room(websocket: WebSocket, applicant_code: str, audio: UploadFile = File(None)):
     await websocket.accept()
     try:
+        # Fetch applicant details
+        fetch = applicant_by_id(applicant_code)
+        resume_content = extract_resume_text(fetch['resume'])
+        applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
+        
+        # Initialize conversation history
+        conversation_history = conversation_histories.get(applicant_code, "")
+
+        # AI sends an initial welcome message
+        initial_response = process_applicant(applicant, resume_content, conversation_history)
+        conversation_histories[applicant_code] = conversation_history + "\nAI: " + initial_response['text']
+
+        # Send the initial AI response back to the client
+        await websocket.send_json({
+            "text": initial_response['text'],
+            "audio_url": f"http://127.0.0.1:8000/apply/audio/{initial_response['audio_filename']}"
+        })
+
         while True:
-            data_in = await websocket.receive_text()
-            fetch = applicant_by_id(applicant_code)
-            resume_content = extract_resume_text(fetch['resume'])
-            applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
-            conversation_history = conversation_histories.get(applicant_code, "")
-            response = process_applicant(applicant, resume_content, conversation_history)
-            await websocket.send_text(content={
-            "text": response['text'],
-            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+            # Receive audio input from the client
+            audio_input = await websocket.receive_bytes()
+            
+            # Save the audio file temporarily for processing
+            audio_temp_path = f"/mnt/data/temp_{applicant_code}.wav"
+            with open(audio_temp_path, "wb") as audio_file:
+                audio_file.write(audio_input)
+            
+            # Convert the audio to text
+            user_input_text = convert_audio_to_text(audio_temp_path)
+            
+            # Process the applicant's response
+            response = process_applicant(applicant, resume_content, conversation_histories[applicant_code])
+            
+            # Update conversation history
+            conversation_histories[applicant_code] += "\nUser: " + user_input_text + "\nAI: " + response['text']
+            
+            # Send AI response back to client
+            await websocket.send_json({
+                "text": response['text'],
+                "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
             })
+
     except WebSocketDisconnect:
-        applicant_chat(applicant_code, response)
+        # Handle WebSocket disconnection
+        applicant_chat(applicant_code, conversation_histories.get(applicant_code, ""))
         return "WebSocket disconnected"

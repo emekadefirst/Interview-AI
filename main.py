@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile
 from pydantic import BaseModel
 import os
+import uvicorn
 import speech_recognition as sr
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,9 +9,9 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from models import Applicant
-from service import service
+from src.service import service
 from upload import router
-from sessions import (
+from src.sessions import (
     all_applicant,
     applicant_by_id,
     all_applicant_chat
@@ -33,6 +34,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get('/')
+def home():
+    return "InAs"
+
 @app.get("/applicants/")
 def get_applicants():
     return all_applicant()
@@ -48,3 +53,7 @@ def get_applicant(applicant_id: int):
 def get_interview_results():
     return all_applicant_chat()
 
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
