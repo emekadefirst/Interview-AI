@@ -22,7 +22,7 @@ service = APIRouter()
 load_dotenv()
 
 try:
-    genai.configure(api_key=os.environ.get('gemini_api'))
+    genai.configure(api_key='AIzaSyDYLbpL7iL00z4AnVcaf2ksxVXhtjN_zd0')
     model = genai.GenerativeModel('gemini-1.5-pro')
 except Exception as e:
     print(f"Failed to configure Generative AI: {e}")
