@@ -19,13 +19,13 @@ class Applicant(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class InterviewConversation(SQLModel, table=True):
+class InterviewSummary(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    applicant: int = Field(foreign_key="applicant.id")
+    applicant: int = Field(foreign_key="applicant.code")
     interview_result: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     def __str__(self):
-        return "Applicant Interview detail with ai"
+        return "Applicant Interview summary with ai"
 
 create_db()

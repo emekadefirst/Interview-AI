@@ -51,7 +51,7 @@ def get_applicant(applicant_id: int):
 
 @app.get("/interview_results/")
 def get_interview_results():
-    return all_applicant_chat()
+    return all_applicant()
 
 
 

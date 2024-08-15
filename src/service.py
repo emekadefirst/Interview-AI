@@ -15,11 +15,8 @@ from fastapi.responses import FileResponse
 
 service = APIRouter()
 
-
-# Load environment variables
 load_dotenv()
 
-# Configure Generative AI model
 try:
     genai.configure(api_key=os.environ.get('gemini_api'))
     model = genai.GenerativeModel('gemini-1.5-pro')
@@ -43,7 +40,6 @@ class ApplicantInfo(BaseModel):
 # Conversation history storage
 conversation_histories = {}
 
-# Extract text from resume PDF
 def extract_resume_text(resume_file_path: str) -> str:
     try:
         with pdfplumber.open(resume_file_path) as pdf:
@@ -51,7 +47,6 @@ def extract_resume_text(resume_file_path: str) -> str:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error extracting resume text: {str(e)}")
 
-# Convert audio to text using speech recognition
 def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
     recognizer = sr.Recognizer()
     try:
@@ -61,7 +56,6 @@ def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
         elif isinstance(audio_input, IO):
             with sr.AudioFile(audio_input) as source:
                 audio_data = recognizer.record(source)
-        else:
             return "Invalid input type. Must be a file path or a file-like object."
 
         return recognizer.recognize_google(audio_data)
@@ -191,15 +185,10 @@ async def get_audio(filename: str):
 async def interview_room(websocket: WebSocket, applicant_code: str, audio: UploadFile = File(None)):
     await websocket.accept()
     try:
-        # Fetch applicant details
         fetch = applicant_by_id(applicant_code)
         resume_content = extract_resume_text(fetch['resume'])
         applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
-        
-        # Initialize conversation history
         conversation_history = conversation_histories.get(applicant_code, "")
-
-        # AI sends an initial welcome message
         initial_response = process_applicant(applicant, resume_content, conversation_history)
         conversation_histories[applicant_code] = conversation_history + "\nAI: " + initial_response['text']
 

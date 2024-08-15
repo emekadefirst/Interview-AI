@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from .models import Applicant, InterviewConversation
+from .models import Applicant, InterviewSummary
 from .database import engine
 
 def create_applicant(fullname, role, about, resume):
@@ -33,20 +33,21 @@ def applicant_by_id(applicant_code):
 
 
 """Chat"""  
-def applicant_chat(code, response):
+def applicant_chat(code, summary):
     with Session(engine) as session:
-        data = InterviewConversation(applicant=code, interview_result=response)
+        data = InterviewSummary(applicant=code, interview_result=summary)
         session.add(data)
         session.commit()
-        return "Applicant created"
-def all_applicant_chat():
-    with Session(engine) as session:
-        statement = select(InterviewConversation)
-        application = session.exec(statement).all()
-        return application
+        return "Summary of Interview"
 
-# def applicant_info_by_id(applicant_id):
-#     with Session(engine) as session:
-#         statement = select(InterviewConversation).where(InterviewConversation.id == applicant_id)
-#         response = session.exec(statement).one_or_none()
-#         return response
+def all_applicant():
+    with Session(engine) as session:
+        statement = select(InterviewSummary)
+        summary = session.exec(statement).all()
+        return summary
+
+def applicant_by_id(applicant_code):
+    with Session(engine) as session:
+        statement = select(InterviewSummary).where(InterviewSummary.code == applicant_code)
+        response = session.exec(statement).one_or_none()
+        return response
