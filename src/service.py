@@ -148,7 +148,7 @@ async def interview(applicant_code: str, audio: UploadFile = File(None)):
         conversation_histories[applicant_code] = response["text"]
         return JSONResponse(content={
             "text": response['text'],
-            "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+            "audio_url": f"https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/apply/audio/{response['audio_filename']}"
         })
 
     if audio:
@@ -187,7 +187,7 @@ async def interview_room(websocket: WebSocket, applicant_code: str):
 
         await websocket.send_json({
             "text": initial_response['text'],
-            "audio_url": f"http://127.0.0.1:8000/apply/audio/{initial_response['audio_filename']}"
+            "audio_url": f"https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/apply/audio/{response['audio_filename']}"
         })
         while True:
             audio_input = await websocket.receive_bytes()
