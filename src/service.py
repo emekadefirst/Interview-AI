@@ -131,7 +131,7 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
 
 @service.post("/interview/{applicant_code}")
 async def interview(applicant_code: str, audio: UploadFile = File(None)):
-    fetch = applicant_by_id(applicant_code)
+    fetch = applicantion_by_id(applicant_code)
     if fetch is None:
         return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
     
