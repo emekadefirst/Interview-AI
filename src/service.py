@@ -200,8 +200,9 @@ async def interview_room(websocket: WebSocket, applicant_code: str):
             conversation_histories[applicant_code] += "\nUser: " + user_input_text + "\nAI: " + response['text']
             await websocket.send_json({
                 "text": response['text'],
-                "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
+                "audio_url": f"https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/apply/audio/{response['audio_filename']}"
             })
+
     except WebSocketDisconnect:
         full_conversation = conversation_histories.get(applicant_code, "")
         summary = generate_interview_summary(full_conversation)
