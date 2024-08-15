@@ -1,7 +1,7 @@
 import os
 from fastapi.staticfiles import StaticFiles
 from fastapi import File, UploadFile, APIRouter, HTTPException, WebSocket, WebSocketDisconnect, WebSocketException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from .sessions import *
 import speech_recognition as sr
@@ -9,9 +9,7 @@ from typing import Union, IO
 from dotenv import load_dotenv
 from gtts import gTTS
 import pdfplumber
-from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
-from fastapi.responses import FileResponse
 
 service = APIRouter()
 
@@ -56,6 +54,7 @@ def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
         elif isinstance(audio_input, IO):
             with sr.AudioFile(audio_input) as source:
                 audio_data = recognizer.record(source)
+        else:
             return "Invalid input type. Must be a file path or a file-like object."
 
         return recognizer.recognize_google(audio_data)
@@ -69,11 +68,10 @@ def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
     except Exception as e:
         return f"An error occurred: {e}"
 
-# Generate interview prompt for the AI model
 def generate_interview_prompt(applicant: ApplicantInfo, resume_content: str, conversation_history: str = "") -> str:
     return f"""
     Your name is InAS, you are an experienced conversational AI interviewer for Our Company. Your task is to conduct a professional and thorough interview with {applicant.fullname} for the position of {applicant.role}. Use the following information to tailor your questions and assess the candidate's suitability for the role:
-    What wherever Tech stack or {applicant.role} they claim to be leverage on your discretion to ask industry-based questions like that of leetcode.
+    What whatever Tech stack or {applicant.role} they claim to be leverage on your discretion to ask industry-based questions like that of leetcode.
     Applicant Information:
     - Name: {applicant.fullname}
     - Role applying for: {applicant.role}
@@ -171,7 +169,7 @@ async def interview(applicant_code: str, audio: UploadFile = File(None)):
             "audio_url": f"http://127.0.0.1:8000/apply/audio/{audio_filename}"
         })
     
-        return JSONResponse(content={"error": "No response generated"}, status_code=400)
+    return JSONResponse(content={"error": "No response generated"}, status_code=400)
 
 @service.get("/apply/audio/{filename}")
 async def get_audio(filename: str):
@@ -180,9 +178,8 @@ async def get_audio(filename: str):
         raise HTTPException(status_code=404, detail="Audio file not found")
     return FileResponse(audio_path)
 
-
 @service.websocket("/interview/{applicant_code}")
-async def interview_room(websocket: WebSocket, applicant_code: str, audio: UploadFile = File(None)):
+async def interview_room(websocket: WebSocket, applicant_code: str):
     await websocket.accept()
     try:
         fetch = applicant_by_id(applicant_code)
@@ -192,37 +189,51 @@ async def interview_room(websocket: WebSocket, applicant_code: str, audio: Uploa
         initial_response = process_applicant(applicant, resume_content, conversation_history)
         conversation_histories[applicant_code] = conversation_history + "\nAI: " + initial_response['text']
 
-        # Send the initial AI response back to the client
         await websocket.send_json({
             "text": initial_response['text'],
             "audio_url": f"http://127.0.0.1:8000/apply/audio/{initial_response['audio_filename']}"
         })
 
         while True:
-            # Receive audio input from the client
             audio_input = await websocket.receive_bytes()
             
-            # Save the audio file temporarily for processing
             audio_temp_path = f"/mnt/data/temp_{applicant_code}.wav"
             with open(audio_temp_path, "wb") as audio_file:
                 audio_file.write(audio_input)
             
-            # Convert the audio to text
             user_input_text = convert_audio_to_text(audio_temp_path)
             
-            # Process the applicant's response
             response = process_applicant(applicant, resume_content, conversation_histories[applicant_code])
             
-            # Update conversation history
             conversation_histories[applicant_code] += "\nUser: " + user_input_text + "\nAI: " + response['text']
             
-            # Send AI response back to client
             await websocket.send_json({
                 "text": response['text'],
                 "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
             })
 
     except WebSocketDisconnect:
-        # Handle WebSocket disconnection
-        applicant_summary(applicant_code, conversation_histories.get(applicant_code, ""))
+        full_conversation = conversation_histories.get(applicant_code, "")
+        summary = generate_interview_summary(full_conversation)
+        store_interview_summary(applicant_code, summary)
         return "WebSocket disconnected"
+
+def generate_interview_summary(conversation):
+    prompt = f"""
+    Based on the following interview conversation, please provide a concise summary 
+    highlighting the key points discussed, the candidate's strengths and weaknesses, 
+    and an overall assessment of their suitability for the role:
+
+    {conversation}
+
+    Please structure the summary as follows:
+    1. Key Points Discussed
+    2. Candidate's Strengths
+    3. Areas for Improvement
+    4. Overall Assessment
+    """
+    response = model.generate_content(prompt)
+    return response.text
+
+def store_interview_summary(applicant_code, summary):
+    chat_history(summary, applicant_code)
