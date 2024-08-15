@@ -11,11 +11,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from src.models import Applicant
 from src.service import service
 from src.upload import router
-from src.sessions import (
-    all_applicant,
-    applicant_by_id,
-    all_applicant_chat
-)
+from src.sessions import *
 
 app = FastAPI(
     title="Interview AI",

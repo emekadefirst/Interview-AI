@@ -1,15 +1,21 @@
 import os
-from fastapi.staticfiles import StaticFiles
-from fastapi import File, UploadFile, APIRouter, HTTPException, WebSocket, WebSocketDisconnect, WebSocketException
-from fastapi.responses import JSONResponse, FileResponse
-from pydantic import BaseModel
+import pdfplumber
 from .sessions import *
-import speech_recognition as sr
+from gtts import gTTS
 from typing import Union, IO
 from dotenv import load_dotenv
-from gtts import gTTS
-import pdfplumber
+from pydantic import BaseModel
+import speech_recognition as sr
 import google.generativeai as genai
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi import File, UploadFile, APIRouter, HTTPException, WebSocket, WebSocketDisconnect, WebSocketException
+
+class ApplicantInfo(BaseModel):
+    fullname: str
+    about: str
+    role: str
+
 
 service = APIRouter()
 
@@ -30,12 +36,6 @@ os.makedirs(RESUME_FOLDER, exist_ok=True)
 
 service.mount("/apply/audio", StaticFiles(directory=AUDIO_FOLDER), name="audio")
 
-class ApplicantInfo(BaseModel):
-    fullname: str
-    about: str
-    role: str
-
-# Conversation history storage
 conversation_histories = {}
 
 def extract_resume_text(resume_file_path: str) -> str:
@@ -54,11 +54,8 @@ def convert_audio_to_text(audio_input: Union[str, IO]) -> str:
         elif isinstance(audio_input, IO):
             with sr.AudioFile(audio_input) as source:
                 audio_data = recognizer.record(source)
-        else:
             return "Invalid input type. Must be a file path or a file-like object."
-
         return recognizer.recognize_google(audio_data)
-
     except sr.UnknownValueError:
         return "Google Speech Recognition could not understand the audio"
     except sr.RequestError as e:
@@ -167,9 +164,8 @@ async def interview(applicant_code: str, audio: UploadFile = File(None)):
         return JSONResponse(content={
             "text": user_response_text,
             "audio_url": f"http://127.0.0.1:8000/apply/audio/{audio_filename}"
-        })
-    
-    return JSONResponse(content={"error": "No response generated"}, status_code=400)
+        })  
+        return JSONResponse(content={"error": "No response generated"}, status_code=400)
 
 @service.get("/apply/audio/{filename}")
 async def get_audio(filename: str):
@@ -193,25 +189,19 @@ async def interview_room(websocket: WebSocket, applicant_code: str):
             "text": initial_response['text'],
             "audio_url": f"http://127.0.0.1:8000/apply/audio/{initial_response['audio_filename']}"
         })
-
         while True:
             audio_input = await websocket.receive_bytes()
             
             audio_temp_path = f"/mnt/data/temp_{applicant_code}.wav"
             with open(audio_temp_path, "wb") as audio_file:
                 audio_file.write(audio_input)
-            
             user_input_text = convert_audio_to_text(audio_temp_path)
-            
             response = process_applicant(applicant, resume_content, conversation_histories[applicant_code])
-            
             conversation_histories[applicant_code] += "\nUser: " + user_input_text + "\nAI: " + response['text']
-            
             await websocket.send_json({
                 "text": response['text'],
                 "audio_url": f"http://127.0.0.1:8000/apply/audio/{response['audio_filename']}"
             })
-
     except WebSocketDisconnect:
         full_conversation = conversation_histories.get(applicant_code, "")
         summary = generate_interview_summary(full_conversation)
