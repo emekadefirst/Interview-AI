@@ -163,7 +163,7 @@ async def interview(applicant_code: str, audio: UploadFile = File(None)):
         
         return JSONResponse(content={
             "text": user_response_text,
-            "audio_url": f"http://127.0.0.1:8000/apply/audio/{audio_filename}"
+            "audio_url": f"https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/apply/audio/{response['audio_filename']}"
         })  
         return JSONResponse(content={"error": "No response generated"}, status_code=400)
 
