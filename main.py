@@ -23,7 +23,7 @@ app = FastAPI(
     version="0.1.0"
 )
 
-app.include_router(service, prefix="/api")
+app.include_router(service)
 app.include_router(router)
 
 app.add_middleware(

@@ -9,10 +9,12 @@ from typing import Union, IO
 from dotenv import load_dotenv
 from gtts import gTTS
 import pdfplumber
+from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
 from fastapi.responses import FileResponse
 
 service = APIRouter()
+
 
 # Load environment variables
 load_dotenv()

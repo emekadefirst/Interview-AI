@@ -4,151 +4,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Interview Room</title>
+    <title>Interview Room</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-        }
-
-        #chat-container {
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
-            background: #fff;
             padding: 20px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
 
-        #chat-box {
-            height: 300px;
+        #chat {
+            height: 400px;
+            border: 1px solid #ccc;
             overflow-y: scroll;
-            border: 1px solid #ddd;
             padding: 10px;
-            background: #f9f9f9;
-            margin-bottom: 20px;
-        }
-
-        .message {
             margin-bottom: 10px;
         }
 
-        .message.ai {
-            color: #007bff;
+        #userInput {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
         }
 
-        .message.user {
-            color: #333;
-            text-align: right;
-        }
-
-        #record-btn {
+        button {
             padding: 10px 20px;
-            background: #007bff;
-            color: #fff;
+            background-color: #007bff;
+            color: white;
             border: none;
             cursor: pointer;
-            border-radius: 5px;
-            outline: none;
         }
 
-        #record-btn.recording {
-            background: #ff4d4d;
+        button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
 
 <body>
-
-    <div id="chat-container">
-        <div id="chat-box"></div>
-        <button id="record-btn">Start Recording</button>
+    <h1>Interview Room</h1>
+    <div>
+        <label for="applicantCode">Applicant Code:</label>
+        <input type="text" id="applicantCode" required>
+        <button onclick="startInterview()">Start Interview</button>
+    </div>
+    <div id="interviewRoom" style="display:none;">
+        <div id="chat"></div>
+        <button id="startRecording">Start Recording</button>
+        <button id="stopRecording" disabled>Stop Recording</button>
+        <audio id="audioPlayback" controls style="display:none;"></audio>
     </div>
 
     <script>
-        const applicantCode = getApplicantCodeFromSession();
-        const websocket = new WebSocket(`ws://127.0.0.1:8000/interview/${applicantCode}`);
-
-        const chatBox = document.getElementById('chat-box');
-        const recordBtn = document.getElementById('record-btn');
+        let socket;
         let mediaRecorder;
         let audioChunks = [];
+        const chat = document.getElementById('chat');
+        const startRecordButton = document.getElementById('startRecording');
+        const stopRecordButton = document.getElementById('stopRecording');
+        const audioPlayback = document.getElementById('audioPlayback');
 
-        websocket.onopen = () => {
-            console.log("WebSocket connection established");
-        };
-
-        websocket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            displayMessage('ai', data.text);
-
-            // Play the AI's audio response
-            const audio = new Audio(data.audio_url);
-            audio.play();
-        };
-
-        websocket.onclose = () => {
-            console.log("WebSocket connection closed");
-        };
-
-        recordBtn.addEventListener('mousedown', startRecording);
-        recordBtn.addEventListener('mouseup', stopRecording);
-        recordBtn.addEventListener('touchstart', startRecording); // For touch devices
-        recordBtn.addEventListener('touchend', stopRecording);   // For touch devices
-
-        function displayMessage(sender, message) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('message', sender);
-            messageElement.innerText = message;
-            chatBox.appendChild(messageElement);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        function getApplicantCodeFromSession() {
-            // Fetch the applicant_code from the session or cookie
-            // This is a placeholder implementation
-            return 'sample_applicant_code'; // Replace with actual retrieval logic
-        }
-
-        function startRecording() {
-            recordBtn.classList.add('recording');
-            recordBtn.innerText = 'Recording...';
-
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    mediaRecorder = new MediaRecorder(stream);
-                    mediaRecorder.start();
-                    audioChunks = [];
-
-                    mediaRecorder.addEventListener("dataavailable", event => {
-                        audioChunks.push(event.data);
-                    });
-                });
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-                recordBtn.classList.remove('recording');
-                recordBtn.innerText = 'Start Recording';
-
-                mediaRecorder.addEventListener("stop", () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    sendAudioToServer(audioBlob);
-                });
+        function startInterview() {
+            const applicantCode = document.getElementById('applicantCode').value;
+            if (!applicantCode) {
+                alert('Please enter an applicant code');
+                return;
             }
-        }
 
-        function sendAudioToServer(audioBlob) {
-            const reader = new FileReader();
-            reader.readAsArrayBuffer(audioBlob);
-            reader.onloadend = () => {
-                websocket.send(reader.result);
+            document.getElementById('interviewRoom').style.display = 'block';
+
+            socket = new WebSocket(`ws://127.0.0.1:8000/interview/${applicantCode}`);
+
+            socket.onopen = function (e) {
+                console.log("WebSocket connection established");
+            };
+
+            socket.onmessage = function (event) {
+                const response = JSON.parse(event.data);
+                displayMessage('AI', response.text);
+                playAudio(response.audio_url);
+            };
+
+            socket.onclose = function (event) {
+                console.log("WebSocket connection closed");
+            };
+
+            socket.onerror = function (error) {
+                console.error("WebSocket error:", error);
             };
         }
-    </script>
 
+        function displayMessage(sender, message) {
+            const messageElement = document.createElement('p');
+            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function playAudio(audioUrl) {
+            audioPlayback.src = audioUrl;
+            audioPlayback.playbackRate = 1.75;  // Set playback speed to 1.75x
+            audioPlayback.style.display = 'block';
+            audioPlayback.play();
+        }
+
+        startRecordButton.onclick = async function () {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.start();
+
+            audioChunks = [];
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+
+            startRecordButton.disabled = true;
+            stopRecordButton.disabled = false;
+        };
+
+        stopRecordButton.onclick = function () {
+            mediaRecorder.stop();
+            startRecordButton.disabled = false;
+            stopRecordButton.disabled = true;
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                socket.send(await audioBlob.arrayBuffer());
+            };
+        };
+    </script>
 </body>
 
 </html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +12,7 @@
             margin: 0;
             background-color: #f0f0f0;
         }
+
         #video-container {
             justify-content: center;
             margin: 20px;
@@ -18,10 +20,12 @@
             height: 100%;
             display: block;
         }
+
         video {
             width: 85%;
             border-radius: 10px;
         }
+
         .video-area {
             background-color: #88898d;
             height: 100%;
@@ -29,6 +33,7 @@
             font-size: 24px;
             padding: 2rem 1rem;
         }
+
         .container {
             max-width: 900px;
             margin: 20px auto;
@@ -37,27 +42,33 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
+
         button {
             margin: 10px;
             padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
         }
-        #recordButton {
+
+        #record-btn {
             background-color: #ff4444;
             color: white;
             border: none;
             border-radius: 5px;
         }
-        #recordButton.recording {
+
+        #record-btn.recording {
             background-color: #44ff44;
         }
+
         .response-area {
             margin-top: 2rem;
         }
+
         .response-area p {
             font-size: 1rem;
         }
+
         #loading {
             display: none;
             text-align: center;
@@ -66,6 +77,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="row items-start p-0">
@@ -80,82 +92,86 @@
                     <video id="webcam" autoplay></video>
                     <div class="contain">
                         <h1>Record Response</h1>
-                        <button id="recordButton" onclick="startRecording()">Start Recording</button>
-                        <button id="stopButton" onclick="stopRecording()" style="display: none;">Stop Recording</button>
+                        <button id="record-btn">Start Recording</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     <div id="loading">Loading interview data...</div>
+
     <script>
+        const recordBtn = document.getElementById('record-btn');
         let mediaRecorder;
-            let audioChunks = [];
+        let audioChunks = [];
+        let websocket;
 
-            const recordButton = document.getElementById('recordButton');
-            const stopButton = document.getElementById('stopButton');
-            const sendButton = document.getElementById('sendButton');
+        // Initialize WebSocket connection
+        function initWebSocket() {
+            websocket = new WebSocket('ws://127.0.0.1:8000/ws/interview/');
+            websocket.onopen = function (event) {
+                console.log('WebSocket connection opened.');
+            };
+            websocket.onmessage = function (event) {
+                console.log('Message received:', event.data);
+                // Handle received messages if needed
+            };
+            websocket.onerror = function (event) {
+                console.error('WebSocket error:', event);
+            };
+            websocket.onclose = function (event) {
+                console.log('WebSocket connection closed.');
+            };
+        }
 
-            recordButton.addEventListener('click', startRecording);
-            stopButton.addEventListener('click', stopRecording);
-            sendButton.addEventListener('click', sendRecording);
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('touchstart', startRecording); // For touch devices
+        recordBtn.addEventListener('touchend', stopRecording);
 
-            async function startRecording() {
-                audioChunks = [];
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        function startRecording() {
+            recordBtn.classList.add('recording');
+            recordBtn.innerText = 'Recording...';
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
                     mediaRecorder = new MediaRecorder(stream);
-
-                    mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        sendButton.style.display = 'inline-block';
-                    };
-
                     mediaRecorder.start();
-                    recordButton.style.display = 'none';
-                    stopButton.style.display = 'inline-block';
-                } catch (err) {
-                    console.error("Error accessing microphone:", err);
-                    alert("Error accessing microphone. Please check your settings.");
-                }
-            }
+                    audioChunks = [];
 
-            function stopRecording() {
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
-                    stopButton.style.display = 'none';
-                    recordButton.style.display = 'inline-block';
-                    recordButton.textContent = 'Record Again';
-                }
-            }
-
-            function sendRecording() {
-                const meetingCode = sessionStorage.getItem('meetingCode');
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'recording.webm');
-
-                // Replace with your actual API endpoint
-                fetch(`http://127.0.0.1:8000/api/interview/${meetingCode}`, {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('Success:', data);
-                        alert('Recording sent successfully!');
-                        sendButton.style.display = 'none';
-                    })
-                    .catch((error) => {
-                        console.error('Error:', error);
-                        alert('An error occurred while sending the recording.');
+                    mediaRecorder.addEventListener("dataavailable", event => {
+                        audioChunks.push(event.data);
                     });
+                });
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordBtn.classList.remove('recording');
+                recordBtn.innerText = 'Start Recording';
+
+                mediaRecorder.addEventListener("stop", () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    sendAudioToServer(audioBlob);
+                });
             }
-    </script>
-    <script>
+        }
+
+        function sendAudioToServer(audioBlob) {
+            const reader = new FileReader();
+            reader.readAsArrayBuffer(audioBlob);
+            reader.onloadend = () => {
+                websocket.send(reader.result);
+            };
+        }
+
+        // Initialize WebSocket connection when the document is ready
+        document.addEventListener('DOMContentLoaded', function () {
+            initWebSocket();
+        });
+
+        // Video Stream Initialization
         const video = document.getElementById('webcam');
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
@@ -167,6 +183,7 @@
                 document.querySelector('.video-area').textContent = 'Error accessing camera. Please check your settings.';
             });
 
+        // Fetch Interview Data with Retry Logic
         async function fetchInterviewDataWithRetry(meetingCode, retries = 3, delay = 10000) {
             const url = `http://127.0.0.1:8000/api/interview/${meetingCode}`;
 
@@ -205,53 +222,54 @@
 
         document.addEventListener('DOMContentLoaded', async function (e) {
             e.preventDefault();
-                const meetingCode = sessionStorage.getItem('meetingCode');
+            const meetingCode = sessionStorage.getItem('meetingCode');
 
-                if (!meetingCode) {
-                    alert('No meeting code found.');
-                    return;
-                }
+            if (!meetingCode) {
+                alert('No meeting code found.');
+                return;
+            }
 
-                document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').style.display = 'block';
 
-                try {
-                    const data = await fetchInterviewDataWithRetry(meetingCode);
-                    const responseText = data.text || 'No text response provided.';
-                    const audioUrl = data.audio_url;
+            try {
+                const data = await fetchInterviewDataWithRetry(meetingCode);
+                const responseText = data.text || 'No text response provided.';
+                const audioUrl = data.audio_url;
 
-                    const responseArea = document.getElementById('responseArea');
+                const responseArea = document.getElementById('responseArea');
 
-                    const textElement = document.createElement('p');
-                    textElement.textContent = responseText;
-                    responseArea.appendChild(textElement);
+                const textElement = document.createElement('p');
+                textElement.textContent = responseText;
+                responseArea.appendChild(textElement);
 
-                    const audioElement = document.createElement('audio');
-                    audioElement.controls = true;
-                    audioElement.src = audioUrl;
-                    audioElement.autoplay = true;
-                    responseArea.appendChild(audioElement);
+                const audioElement = document.createElement('audio');
+                audioElement.controls = true;
+                audioElement.src = audioUrl;
+                audioElement.autoplay = true;
+                responseArea.appendChild(audioElement);
 
-                    setTimeout(() => {
+                setTimeout(() => {
+                    audioElement.playbackRate = 1.75;
+                }, 100);
+
+                audioElement.addEventListener('ratechange', () => {
+                    if (audioElement.playbackRate !== 1.75) {
                         audioElement.playbackRate = 1.75;
-                    }, 100);
+                    }
+                });
 
-                    audioElement.addEventListener('ratechange', () => {
-                        if (audioElement.playbackRate !== 1.75) {
-                            audioElement.playbackRate = 1.75;
-                        }
-                    });
+                // Wait for 5 seconds before reloading the page
+                setTimeout(() => {
+                    location.reload();
+                }, 5000);
 
-                    // Wait for 5 seconds before reloading the page
-                    setTimeout(() => {
-                        location.reload();
-                    }, 5000);
-
-                } catch (error) {
-                    alert('An error occurred while fetching the interview data. Please check the console for more details.');
-                } finally {
-                    document.getElementById('loading').style.display = 'none';
-                }
-            });
+            } catch (error) {
+                alert('An error occurred while fetching the interview data. Please check the console for more details.');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
     </script>
 </body>
+
 </html>
