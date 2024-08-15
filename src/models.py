@@ -19,6 +19,13 @@ class Applicant(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class Interview_session(SQLModel, Table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    applicant: int = Field(foreign_key="applicant.code")
+    chat: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+
 class InterviewSummary(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     applicant: int = Field(foreign_key="applicant.code")

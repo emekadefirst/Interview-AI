@@ -10,5 +10,10 @@ class Car:
     def speed(self):
         return self.engine
     
-my_car = Car("Porshe", "911", "2021", "red", "mannual", "v8")
-print(my_car.speed())
+# my_car = Car("Porshe", "911", "2021", "red", "mannual", "v8")
+# print(my_car.speed())
+
+class MyCar(Car):
+    print("done")
+
+my_motor = MyCar("Porshe", "911", "2021", "red", "mannual", "v8")

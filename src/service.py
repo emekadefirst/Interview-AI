@@ -224,5 +224,5 @@ async def interview_room(websocket: WebSocket, applicant_code: str, audio: Uploa
 
     except WebSocketDisconnect:
         # Handle WebSocket disconnection
-        applicant_chat(applicant_code, conversation_histories.get(applicant_code, ""))
+        applicant_summary(applicant_code, conversation_histories.get(applicant_code, ""))
         return "WebSocket disconnected"
