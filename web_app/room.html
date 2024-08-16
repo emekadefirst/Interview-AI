@@ -123,28 +123,22 @@
 
                 // Get form data
                 const formData = new FormData();
-                const applicantCode = document.getElementById('applicantCode').value;
+                const meetingCode = sessionStorage.getItem('meetingCode');
                 const audioFile = document.getElementById('audioFile').files[0];
 
                 formData.append('audio', audioFile);
-
                 try {
-                    const response = await fetch(`https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/interview/${applicantCode}`, {
+                    const response = await fetch(`https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/interview/${meetingCode}`, {
                         method: 'POST',
                         body: formData
                     });
 
                     const data = await response.json();
-
-                    // Display the interview text
                     document.getElementById('interviewText').textContent = data.text;
-
-                    // Set the audio source and playback rate
                     const audioPlayer = document.getElementById('audioPlayer');
                     audioPlayer.src = data.audio_url;
-                    audioPlayer.playbackRate = 1.75;
+                    audioPlayer.playbackRate = 1.25;
 
-                    // Play the audio
                     audioPlayer.play();
                 } catch (error) {
                     console.error('Error starting interview:', error);
@@ -165,26 +159,6 @@
                 });
 
             // fetch data
-            async function startInterview() {
-                try {
-                    const response = await fetch('https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/interview/20240816013159', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                    });
-
-                    const data = await response.json();
-                    document.getElementById('interviewText').textContent = data.text;
-                    const audioPlayer = document.getElementById('audioPlayer');
-                    audioPlayer.src = data.audio_url;
-                    audioPlayer.playbackRate = 1.25;
-                    audioPlayer.play();
-                } catch (error) {
-                    console.error('Error starting interview:', error);
-                }
-            }
-            window.onload = startInterview;
         </script>
         <script>
             let mediaRecorder;
