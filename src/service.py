@@ -131,7 +131,7 @@ def process_applicant(applicant: ApplicantInfo, resume_content: str, conversatio
 
 @service.post("/interview/{applicant_code}")
 async def interview(applicant_code: str, audio: UploadFile = File(None)):
-    fetch = applicantion_by_id(applicant_code)
+    fetch = applicant_by_code(applicant_code)
     if fetch is None:
         return JSONResponse(content={"error": "Applicant not found"}, status_code=404)
     
@@ -178,7 +178,7 @@ async def get_audio(filename: str):
 async def interview_room(websocket: WebSocket, applicant_code: str):
     await websocket.accept()
     try:
-        fetch = applicant_by_id(applicant_code)
+        fetch = applicant_by_code(applicant_code)
         resume_content = extract_resume_text(fetch['resume'])
         applicant = ApplicantInfo(fullname=fetch['fullname'], role=fetch['role'], about=fetch['about'])
         conversation_history = conversation_histories.get(applicant_code, "")

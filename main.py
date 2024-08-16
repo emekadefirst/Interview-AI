@@ -36,18 +36,18 @@ def home():
 
 @app.get("/applicants/")
 def get_applicants():
-    return all_applicant()
+    return all_applicants()
 
 @app.get("/applicant/{applicant_id}", response_model=Applicant)
 def get_applicant(applicant_id: int):
-    applicant = applicant_by_id(applicant_id)
+    applicant = applicant_by_code(applicant_id)
     if not applicant:
         raise HTTPException(status_code=404, detail="Applicant not found")
     return applicant
 
 @app.get("/interview_results/")
 def get_interview_results():
-    return all_applicant()
+    return all_summaries()
 
 
 
