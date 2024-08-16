@@ -117,20 +117,61 @@
             </div>
         </div>
     </div>
-        <script>
+        <!-- <script>
             document.getElementById('interviewForm').onsubmit = async function (event) {
                 event.preventDefault();
 
                 // Get form data
                 const formData = new FormData();
-                const meetingCode = sessionStorage.getItem('meetingCode');
+                const applicantCode = document.getElementById('applicantCode').value;
                 const audioFile = document.getElementById('audioFile').files[0];
 
                 formData.append('audio', audioFile);
+
+                try {
+                    const response = await fetch(`https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/interview/${applicantCode}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    // Display the interview text
+                    document.getElementById('interviewText').textContent = data.text;
+
+                    // Set the audio source and playback rate
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    audioPlayer.src = data.audio_url;
+                    audioPlayer.playbackRate = 1.75;
+
+                    // Play the audio
+                    audioPlayer.play();
+                } catch (error) {
+                    console.error('Error starting interview:', error);
+                }
+            }
+        </script> -->
+        <script>
+            const meetingCode = sessionStorage.getItem('meetingCode');
+            const video = document.getElementById('webcam');
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => {
+                        video.srcObject = stream;
+                        video.onloadedmetadata = () => video.play();
+                    })
+                    .catch(error => {
+                        console.error('Error accessing camera:', error);
+                        document.querySelector('.video-area').textContent = 'Error accessing camera. Please check your settings.';
+                    });
+
+            // fetch data
+            async function startInterview() {
                 try {
                     const response = await fetch(`https://cognitive-dagmar-emekadefirst-156954a7.koyeb.app/interview/${meetingCode}`, {
                         method: 'POST',
-                        body: formData
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
                     });
 
                     const data = await response.json();
@@ -138,27 +179,12 @@
                     const audioPlayer = document.getElementById('audioPlayer');
                     audioPlayer.src = data.audio_url;
                     audioPlayer.playbackRate = 1.25;
-
                     audioPlayer.play();
                 } catch (error) {
                     console.error('Error starting interview:', error);
                 }
             }
-        </script>
-        <script>
-        // Web Cam
-        const video = document.getElementById('webcam');
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => {
-                    video.srcObject = stream;
-                    video.onloadedmetadata = () => video.play();
-                })
-                .catch(error => {
-                    console.error('Error accessing camera:', error);
-                    document.querySelector('.video-area').textContent = 'Error accessing camera. Please check your settings.';
-                });
-
-            // fetch data
+            window.onload = startInterview;
         </script>
         <script>
             let mediaRecorder;
